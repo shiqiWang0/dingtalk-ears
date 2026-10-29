@@ -1,0 +1,20 @@
+backend/panel_store.py
+  h_0c940a947252a6 280-287
+backend/static/panel.css
+  h_0c940a947252a6 489
+backend/static/panel.js
+  h_0c940a947252a6 146,148,166
+backend/web.py
+  h_0c940a947252a6 102-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f97afb9a3f38867b204bbe9231bbcd571104dfc6",
+  "prompts": {},
+  "humans": {
+    "h_0c940a947252a6": {
+      "author": "liuyi <liuyi@dtstack.com>"
+    }
+  }
+}
