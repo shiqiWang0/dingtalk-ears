@@ -329,5 +329,93 @@ document.getElementById('todo-form').onsubmit = async (event) => {
     submit.disabled = false;
   }
 };
+function hookForm() {
+  return {
+    enabled: document.getElementById('hooks-enabled').checked,
+    url: document.getElementById('hooks-url').value.trim(),
+    secret: document.getElementById('hooks-secret').value,
+    filter: {
+      sources: [...document.querySelectorAll('[name=hooks-source]:checked')].map(
+        (node) => node.value,
+      ),
+      needs_reply_only: document.getElementById('hooks-needs-reply').checked,
+    },
+  };
+}
+function hookResult(result) {
+  const box = document.getElementById('hooks-result');
+  box.className = 'small';
+  if (!result) {
+    box.textContent = '还没有投递记录。';
+    return;
+  }
+  box.classList.add(result.ok ? 'hook-ok' : 'hook-failed');
+  box.textContent =
+    (result.event === 'hook.test' ? '测试投递' : '最近投递') +
+    (result.ok ? '成功' : '失败') +
+    ' · ' +
+    (result.status ? 'HTTP ' + result.status : result.error || '无响应') +
+    ' · 尝试 ' +
+    result.attempts +
+    ' 次 · ' +
+    result.time;
+}
+function fillHooks(value) {
+  document.getElementById('hooks-enabled').checked = value.enabled;
+  document.getElementById('hooks-url').value = value.url;
+  const secret = document.getElementById('hooks-secret');
+  secret.value = '';
+  secret.placeholder = value.secret_set ? '已设置，留空表示不修改' : '至少 16 个字符';
+  for (const node of document.querySelectorAll('[name=hooks-source]'))
+    node.checked = value.filter.sources.includes(node.value);
+  document.getElementById('hooks-needs-reply').checked = value.filter.needs_reply_only;
+  document.getElementById('hooks-group-name').textContent =
+    (snapshot && snapshot.status.group_name) || '关注群';
+  hookResult(value.last);
+}
+async function hookRequest(path, data) {
+  const response = await fetch('/api/' + path, {
+    method: data ? 'POST' : 'GET',
+    headers: data ? { 'Content-Type': 'application/json', 'X-Panel-Token': token } : {},
+    body: data ? JSON.stringify(data) : undefined,
+    cache: 'no-store',
+  });
+  const value = await response.json();
+  if (!response.ok) throw Error(value.error || '操作未完成');
+  return value;
+}
+async function hookAction(path, data) {
+  const errorBox = document.getElementById('hooks-error');
+  errorBox.textContent = '';
+  try {
+    return await hookRequest(path, data);
+  } catch (e) {
+    errorBox.textContent = e.message;
+    return null;
+  }
+}
+document.getElementById('hooks-open').onclick = async () => {
+  const value = await hookAction('hooks');
+  if (value) fillHooks(value);
+  document.getElementById('hooks-dialog').showModal();
+};
+document.getElementById('hooks-cancel').onclick = () =>
+  document.getElementById('hooks-dialog').close();
+document.getElementById('hooks-test').onclick = async (event) => {
+  event.target.disabled = true;
+  document.getElementById('hooks-result').textContent = '正在发送测试消息…';
+  const result = await hookAction('hooks/test', hookForm());
+  if (result) hookResult(result);
+  else document.getElementById('hooks-result').textContent = '';
+  event.target.disabled = false;
+};
+document.getElementById('hooks-form').onsubmit = async (event) => {
+  event.preventDefault();
+  const value = await hookAction('hooks', hookForm());
+  if (value) {
+    fillHooks(value);
+    document.getElementById('hooks-result').textContent = '已保存。';
+  }
+};
 refresh();
 setInterval(refresh, 1500);

@@ -24,7 +24,7 @@ ROOT_FILES = {
     "stylelint.config.cjs",
     "eslint.config.mjs",
 }
-DOC_FILES = {"安装配置与启动.md", "架构说明.md"}
+DOC_FILES = {"安装配置与启动.md", "架构说明.md", "外部Hooks.md"}
 
 
 def create_archive(root, output):

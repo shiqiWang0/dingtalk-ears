@@ -1,16 +1,23 @@
 """Loopback HTTP panel with strict Host, Origin and action-token validation."""
 
 import json
+import re
 import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import unquote
 
 from .dingtalk import create_todo, deliver
+from .hooks import SIGNATURE_HEADER, TIMESTAMP_HEADER, HookSender, verify
+
+MESSAGE_ACTION = re.compile(r"^/messages/([^/?#]+)/(reply|dismiss)$")
 
 
-def start_panel(store, status, regenerate, port=None):
+def start_panel(store, status, regenerate, port=None, hooks=None):
     port = store.config.port if port is None else port
+    if hooks is None:
+        hooks = HookSender(getattr(store.config, "hooks", None))
     static = Path(__file__).with_name("static")
     token = secrets.token_urlsafe(32)
     origin = "http://127.0.0.1:" + str(port)
@@ -68,6 +75,8 @@ def start_panel(store, status, regenerate, port=None):
                     (static / "panel.css").read_text(encoding="utf-8"),
                     "text/css; charset=utf-8",
                 )
+            if self.path == "/api/hooks":
+                return self.reply(200, hooks.public())
             if self.path == "/api/state":
                 return self.reply(
                     200,
@@ -79,14 +88,57 @@ def start_panel(store, status, regenerate, port=None):
                 )
             self.reply(404, {"error": "不存在"})
 
+        def signed(self, raw):
+            """External callers sign the raw body with the hooks secret; no Origin allowed."""
+            secret = hooks.settings["secret"] if hooks.settings["enabled"] else ""
+            return not self.headers.get("Origin") and verify(
+                secret,
+                self.headers.get(TIMESTAMP_HEADER, ""),
+                raw,
+                self.headers.get(SIGNATURE_HEADER, ""),
+            )
+
+        def message_action(self, key, verb, raw):
+            if not (self.allowed(True) or self.signed(raw)):
+                return self.reply(403, {"error": "签名或面板校验失败"})
+            try:
+                body = json.loads(raw.decode("utf-8")) if raw else {}
+                if not isinstance(body, dict):
+                    raise ValueError("请求内容需要 JSON 对象")
+                key = unquote(key)
+                if verb == "reply":
+                    draft, message = store.claim_reply(key, body.get("text"))
+                    threading.Thread(
+                        target=deliver, args=(store, draft, message, regenerate), daemon=True
+                    ).start()
+                    return self.reply(202, {"ok": True, "id": key, "draft_id": draft["id"]})
+                store.archive_message(key)
+                regenerate("__overview__")
+                return self.reply(202, {"ok": True, "id": key, "handled": True})
+            except (ValueError, KeyError, TypeError) as error:
+                return self.reply(409, {"error": str(error)})
+
         def do_POST(self):
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                length = -1
+            if not 0 <= length <= 65536:
+                return self.reply(413, {"error": "请求内容大小不正确"})
+            raw = self.rfile.read(length) if length else b""
+            action = MESSAGE_ACTION.match(self.path)
+            if action:
+                return self.message_action(action.group(1), action.group(2), raw)
             if not self.allowed(True):
                 return self.reply(403, {"error": "请求校验失败，请从本地面板操作"})
             try:
-                length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 65536:
+                if not raw:
                     raise ValueError("请求内容大小不正确")
-                body = json.loads(self.rfile.read(length).decode("utf-8"))
+                body = json.loads(raw.decode("utf-8"))
+                if self.path == "/api/hooks":
+                    return self.reply(200, hooks.update(body))
+                if self.path == "/api/hooks/test":
+                    return self.reply(200, hooks.send_test(body))
                 if self.path == "/api/send":
                     draft, message = store.claim_send(body["id"], body["version"], body["text"])
                     threading.Thread(

@@ -15,6 +15,7 @@
         ><button data-filter="direct">谁找我</button><button data-filter="at">谁 @我</button
         ><button data-filter="ued">关注群</button>
       </nav>
+      <button id="hooks-open" class="settings-link">Hooks 设置</button>
       <div class="bottom hint">只关注消息，不接入 OA 审批。<br />回复由你确认后发送。</div>
     </aside>
     <main>
@@ -61,6 +62,53 @@
         <div class="actions">
           <button type="button" id="todo-cancel">取消</button
           ><button type="submit" id="todo-submit" class="primary">确认添加</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="hooks-dialog">
+      <form id="hooks-form">
+        <h2>Hooks 设置</h2>
+        <p class="small">
+          新消息由 AI 整理后，把原文、分类和建议回复 POST 到下面的地址。只配一个目标，默认关闭。
+        </p>
+        <label class="check"><input type="checkbox" id="hooks-enabled" /> 启用 Hooks</label>
+        <label for="hooks-url">地址</label
+        ><input
+          id="hooks-url"
+          type="url"
+          placeholder="https://example.com/hook"
+          autocomplete="off"
+        />
+        <label for="hooks-secret">签名密钥</label
+        ><input
+          id="hooks-secret"
+          type="password"
+          minlength="16"
+          placeholder="至少 16 个字符"
+          autocomplete="new-password"
+        />
+        <fieldset>
+          <legend>转发哪些消息</legend>
+          <label class="check"
+            ><input type="checkbox" name="hooks-source" value="direct" /> 单聊</label
+          ><label class="check"><input type="checkbox" name="hooks-source" value="at" /> @我</label
+          ><label class="check"
+            ><input type="checkbox" name="hooks-source" value="ued" />
+            <span id="hooks-group-name">关注群</span></label
+          >
+          <label class="check"
+            ><input type="checkbox" id="hooks-needs-reply" /> 只转需要回复的</label
+          >
+        </fieldset>
+        <p class="small">
+          签名：HMAC-SHA256(密钥, 时间戳 + "." + 原始请求体)，放在 X-Ears-Signature。
+        </p>
+        <p id="hooks-result" class="small"></p>
+        <p id="hooks-error" class="dialog-error"></p>
+        <div class="actions">
+          <button type="button" id="hooks-test">发送测试</button
+          ><button type="button" id="hooks-cancel">关闭</button
+          ><button type="submit" id="hooks-save" class="primary">保存</button>
         </div>
       </form>
     </dialog>

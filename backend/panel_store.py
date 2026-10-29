@@ -3,6 +3,7 @@
 import hashlib
 import json
 import sqlite3
+import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -261,6 +262,34 @@ class PanelStore:
             )
             draft.update(status="sending", text=text, version=version + 1)
         return draft, message
+
+    reply_lock = threading.Lock()
+
+    def claim_reply(self, key, text):
+        """Reuse the pending draft or open a manual one, then apply the normal send checks.
+
+        A message that already has a sending, unknown or delivered reply is never sent again,
+        so a retried or duplicated external call cannot produce a second DingTalk message.
+        """
+        with self.reply_lock:
+            with self.connect() as db:
+                if not db.execute("SELECT 1 FROM inbox WHERE key=?", (key,)).fetchone():
+                    raise ValueError("原消息不存在")
+                if db.execute(
+                    "SELECT 1 FROM drafts WHERE message_key=? AND status IN ('sending','unknown','delivered')",
+                    (key,),
+                ).fetchone():
+                    raise ValueError("这条消息已有发送记录，为避免重复不会再次发送")
+                row = db.execute(
+                    "SELECT id,version,status FROM drafts WHERE message_key=? ORDER BY created DESC LIMIT 1",
+                    (key,),
+                ).fetchone()
+            if row and row["status"] == "pending":
+                ident, version = row["id"], row["version"]
+            else:
+                draft = self.create_draft(key, "外部回复", "", None)
+                ident, version = draft["id"], draft["version"]
+            return self.claim_send(ident, version, text)
 
     def finish_send(self, ident, receipt):
         status = "delivered" if receipt.get("deliveryStatus") == "delivered" else "unknown"

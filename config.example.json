@@ -22,5 +22,16 @@
     "group_seconds": 300,
     "trigger_count": 20,
     "max_messages": 50
+  },
+  "hooks": {
+    "enabled": false,
+    "url": "",
+    "secret": "",
+    "filter": {
+      "sources": ["direct", "at"],
+      "needs_reply_only": false
+    },
+    "timeout_seconds": 5,
+    "retries": 2
   }
 }

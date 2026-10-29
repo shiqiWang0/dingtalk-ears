@@ -1,9 +1,13 @@
 """Validated settings, config-relative paths and per-account state ownership."""
 
+import copy
 import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
+
+from .hooks import DEFAULTS as HOOK_DEFAULTS
+from .hooks import validate_hooks
 
 EXAMPLE = {
     "profile": "填写corpId:userId",
@@ -14,6 +18,7 @@ EXAMPLE = {
     "paths": {"state_dir": "./data", "output_dir": "./data/output"},
     "commands": {"dws": "dws", "codex": "codex"},
     "batch": {"direct_seconds": 30, "group_seconds": 300, "trigger_count": 20, "max_messages": 50},
+    "hooks": copy.deepcopy(HOOK_DEFAULTS),
 }
 
 
@@ -33,6 +38,8 @@ class Settings:
     group_seconds: int = 300
     trigger_count: int = 20
     max_messages: int = 50
+    hooks: dict = None
+    config_path: Path = None
 
     @property
     def panel_url(self):
@@ -111,6 +118,8 @@ def load_config(path):
         output_dir=config_path("output_dir"),
         dws=command_path("dws"),
         codex=command_path("codex"),
+        hooks=validate_hooks(value.get("hooks")),
+        config_path=path,
         **batch,
     )
 

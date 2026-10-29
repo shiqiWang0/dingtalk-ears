@@ -11,6 +11,7 @@ import time
 
 from .appserver import AppServer
 from .config import bind_state
+from .hooks import HookSender
 from .listeners import ListenerManager
 from .panel_store import PanelStore
 from .queue_store import Store
@@ -44,6 +45,9 @@ class Host:
         self.listeners = ListenerManager(config, self.status, self.inbox, self.stop)
         self.busy = False
         self.paused = False
+        self.hooks = HookSender(
+            getattr(config, "hooks", None), getattr(config, "config_path", None)
+        )
 
     def create_agent(self):
         return AppServer(
@@ -76,8 +80,9 @@ class Host:
                     },
                 )
                 if not self.panel.is_message_handled(messages[-1]["key"]):
+                    draft = None
                     try:
-                        self.panel.create_draft(
+                        draft = self.panel.create_draft(
                             messages[-1]["key"], result["summary"], result["draft"], thread_id
                         )
                     except ValueError:
@@ -86,6 +91,8 @@ class Host:
                     self.panel.add_candidates(
                         result.get("todos", []), [message["key"] for message in messages]
                     )
+                    if draft:
+                        self.hooks.notify(messages, draft, result.get("needs_reply"))
                 texts.append(result["summary"])
             try:
                 self.update_overview()
@@ -140,7 +147,7 @@ class Host:
         self.overview_requested = self.panel.get_overview()["updated"] is None
         for message in store.history():
             self.panel.receive(message)
-        server = start_panel(self.panel, lambda: self.status, self.controls.put)
+        server = start_panel(self.panel, lambda: self.status, self.controls.put, hooks=self.hooks)
         try:
             self.agent = self.create_agent()
             self.status["appserver"] = "ready"

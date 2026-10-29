@@ -460,3 +460,46 @@ dialog .dialog-error {
 .brand-dot {
   color: #72916a;
 }
+
+.settings-link {
+  margin-top: 22px;
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+}
+
+dialog fieldset {
+  border: 1px solid #dce4d9;
+  border-radius: 8px;
+  margin: 16px 0 6px;
+  padding: 10px 14px;
+}
+
+dialog legend {
+  font-size: 13px;
+  padding: 0 4px;
+}
+
+dialog label.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 16px 6px 0;
+}
+
+dialog input[type='checkbox'] {
+  width: auto;
+  padding: 0;
+}
+
+dialog input + label {
+  margin-top: 14px;
+}
+
+.hook-ok {
+  color: #2f6b3f;
+}
+
+.hook-failed {
+  color: #9b4935;
+}
