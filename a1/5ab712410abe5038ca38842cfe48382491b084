@@ -1,0 +1,36 @@
+backend/agy_client.py
+  h_0c940a947252a6 1-159
+backend/ai_contract.py
+  h_0c940a947252a6 38,40
+backend/appserver.py
+  h_0c940a947252a6 208-211
+backend/config.py
+  h_0c940a947252a6 15-17,34-36,98-102,107-108,124-126
+backend/diagnostics.py
+  h_0c940a947252a6 13-15,110-129
+backend/host.py
+  h_0c940a947252a6 38,50-60,70
+backend/static/index.html
+  h_0c940a947252a6 28
+backend/static/panel.js
+  h_0c940a947252a6 211-214
+config.example.json
+  h_0c940a947252a6 18-19,21-22
+tests/test_agy_client.py
+  h_0c940a947252a6 1-110
+tests/test_config.py
+  h_0c940a947252a6 70,74-93
+tests/test_diagnostics.py
+  h_0c940a947252a6 52-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a15ab712410abe5038ca38842cfe48382491b084",
+  "prompts": {},
+  "humans": {
+    "h_0c940a947252a6": {
+      "author": "liuyi <liuyi@dtstack.com>"
+    }
+  }
+}
