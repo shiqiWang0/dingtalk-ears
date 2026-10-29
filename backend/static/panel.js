@@ -5,6 +5,7 @@ let filter = 'all',
   loading = false,
   last = '';
 const edits = new Map();
+const seen = new Set();
 const statuses = {
   pending: '待你审查',
   sending: '正在发送，请勿重复操作',
@@ -44,12 +45,14 @@ function button(label, fn, cls) {
   const node = el('button', label, cls);
   node.onclick = async () => {
     node.disabled = true;
+    node.setAttribute('aria-busy', 'true');
     try {
       await fn();
     } catch (e) {
       error(e.message);
     } finally {
       node.disabled = false;
+      node.removeAttribute('aria-busy');
     }
   };
   return node;
@@ -80,31 +83,45 @@ function renderTodos(active) {
     (item) => item.task.status === 'candidate',
   ).length;
   if (!todos.length) {
-    root.append(el('p', '暂未发现明确的待办。也可以从消息卡片手动添加。', 'small'));
+    root.append(el('p', '暂无', 'meta-line'));
     return;
   }
   for (const { task, message } of todos) {
-    const item = el('div', undefined, 'todo-item');
+    const item = el(
+      'div',
+      undefined,
+      'todo-item ' +
+        ({ created: 'done', unknown: 'unknown', creating: 'creating' }[task.status] || ''),
+    );
     item.append(
       el('div', task.title, 'todo-name'),
-      el('div', '来自 ' + message.sender + '：' + task.evidence, 'evidence'),
+      el('div', message.sender + ' · ' + task.evidence, 'evidence'),
     );
     if (task.status === 'candidate') {
       const actions = el('div', undefined, 'todo-action');
-      actions.append(
-        button('添加待办', () => openTodo({ id: task.id, title: task.title }), 'primary'),
-      );
+      actions.append(button('添加', () => openTodo({ id: task.id, title: task.title }), 'primary'));
       item.append(actions);
     } else item.append(el('div', todoStatuses[task.status] || task.status, 'todo-state'));
     root.append(item);
   }
 }
 function messageCard(message) {
-  const card = el('article'),
-    meta = el('div', undefined, 'meta');
-  meta.append(el('span', message.sender, 'name'));
+  const draft = message.draft;
+  const needs =
+    !message.handled &&
+    draft &&
+    ((draft.status === 'pending' && draft.text.trim()) || draft.status === 'unknown');
+  const card = el(
+      'article',
+      undefined,
+      (seen.has(message.key) ? '' : 'enter') + (needs ? ' needs' : ''),
+    ),
+    meta = el('div', undefined, 'meta'),
+    who = el('div', undefined, 'who');
+  seen.add(message.key);
+  who.append(el('span', message.sender, 'name'));
   for (const source of message.sources)
-    meta.append(
+    who.append(
       el(
         'span',
         { direct: '单聊', at: '@我', ued: snapshot.status.group_name || '关注群' }[source] ||
@@ -112,34 +129,38 @@ function messageCard(message) {
         'tag',
       ),
     );
-  if (message.ingest_mode === 'history_backfill') meta.append(el('span', '历史补读', 'tag'));
-  meta.append(el('span', String(message.time || '时间未提供'), 'time'));
+  if (message.ingest_mode === 'history_backfill') who.append(el('span', '历史补读', 'tag'));
+  const time = el(
+    'time',
+    String(message.time || '时间未提供').replace(
+      /^\d{4}-(\d{2}-\d{2}) (\d{2}:\d{2}):\d{2}.*$/,
+      '$1 $2',
+    ),
+    'time',
+  );
+  time.title = String(message.time || '');
+  meta.append(time, who);
   card.append(meta, el('div', clean(message.text), 'original'));
-  const draft = message.draft;
-  if (draft)
-    card.append(el('span', '消息整理', 'label'), el('div', draft.summary || '手动回复', 'summary'));
+  const codex = el('div', undefined, 'codex');
+  if (draft) codex.append(el('div', draft.summary || '手动回复', 'summary'));
   if (message.handled) {
-    if (draft && draft.status === 'delivered')
-      card.append(el('span', '已发送 · 投递成功', 'label'), el('div', draft.text, 'sent'));
-    else card.append(el('div', '已处理', 'receipt'));
+    if (draft && draft.status === 'delivered') codex.append(el('div', draft.text, 'sent'));
+    else codex.append(el('div', '已处理', 'label'));
+    card.append(codex);
     return card;
   }
+  card.append(codex);
   const actions = el('div', undefined, 'actions');
   if (draft) {
-    card.append(
-      el(
-        'div',
-        draft.status === 'pending' && !draft.text.trim()
-          ? '暂无回复建议，可手动填写'
-          : statuses[draft.status] || draft.status,
-        'label',
-      ),
-    );
+    if (draft.status !== 'pending')
+      codex.append(
+        el('div', statuses[draft.status] || draft.status, 'label state-' + draft.status),
+      );
     if (draft.status === 'pending') {
       const field = el('textarea');
       field.setAttribute('aria-label', '给' + message.sender + '的回复草稿');
       field.value = edits.has(draft.id) ? edits.get(draft.id) : draft.text;
-      field.placeholder = '写下你希望回复的内容';
+      field.placeholder = draft.text.trim() ? '写下你希望回复的内容' : '暂无回复建议，可手动填写';
       const send = button(
         '确认发送',
         async () => {
@@ -154,15 +175,15 @@ function messageCard(message) {
         edits.set(draft.id, field.value);
         send.disabled = !field.value.trim();
       };
-      card.append(field);
+      codex.append(field);
       actions.append(send);
     }
     if (draft.status !== 'sending')
       actions.append(button('重新生成', () => action('regenerate', { key: message.key })));
     if (draft.receipt)
-      card.append(el('div', draft.receipt.error || '请在钉钉核对投递结果。', 'receipt'));
+      codex.append(el('div', draft.receipt.error || '请在钉钉核对投递结果。', 'receipt'));
   } else {
-    card.append(el('div', '消息已收到，等待 AI 整理。图片和附件不会自动识别。', 'label'));
+    codex.append(el('div', '等待整理', 'label state-none'));
     actions.append(
       button('手动回复', () => action('manual', { key: message.key })),
       button('生成草稿', () => action('regenerate', { key: message.key }), 'primary'),
@@ -173,7 +194,7 @@ function messageCard(message) {
       button('添加待办', () => manualTodo(message)),
       button('标记已处理', () => action('handled', { key: message.key })),
     );
-  card.append(actions);
+  codex.append(actions);
   return card;
 }
 function render() {
@@ -190,24 +211,33 @@ function render() {
   const ready = Object.values(status.listeners || {}).filter(
     (item) => item.state === 'ready',
   ).length;
+  document.getElementById('status').dataset.state =
+    degraded || status.summary_state === 'paused_after_error'
+      ? 'degraded'
+      : ready === expected
+        ? 'live'
+        : 'starting';
   document.getElementById('listening').textContent = degraded
     ? '连接异常'
     : ready === expected
-      ? '已订阅 ' + ready + ' 路'
+      ? ready + ' 路'
       : ready + '/' + expected + ' 已订阅';
   const counts = Object.fromEntries(
     Object.entries(status.listeners || {}).map(([key, value]) => [key, value.accepted || 0]),
   );
-  document.getElementById('listener-note').textContent =
-    '本次进程实际接收：单聊 ' +
-    (counts.direct || 0) +
-    ' 条，@我 ' +
-    (counts.at || 0) +
-    ' 条，' +
-    (status.group_name || '关注群') +
-    ' ' +
-    (counts.ued || 0) +
-    ' 条。历史补读不计入实时接收；订阅就绪不代表已验证群事件投递。';
+  const note = document.getElementById('listener-note');
+  note.replaceChildren(
+    ...[
+      ['单聊', counts.direct],
+      ['@我', counts.at],
+      [status.group_name || '关注群', counts.ued],
+    ].map(([key, value]) => {
+      const row = el('div');
+      row.append(el('dt', key), el('dd', (value || 0) + ' 条'));
+      return row;
+    }),
+  );
+  note.title = '历史补读不计入实时接收；订阅就绪不代表已验证群事件投递。';
   document.getElementById('agent').textContent =
     status.summary_state === 'generating'
       ? '生成中'
@@ -216,9 +246,11 @@ function render() {
         : status.appserver === 'ready'
           ? '已连接'
           : '连接中';
-  document.getElementById('pending').textContent = active.filter(
+  const pendingCount = active.filter(
     (message) => message.draft && message.draft.status === 'pending' && message.draft.text.trim(),
   ).length;
+  document.getElementById('pending').textContent = pendingCount;
+  document.getElementById('pending').parentElement.dataset.n = pendingCount;
   error(
     status.error ||
       (degraded ? '消息连接已降级，请检查监听日志；订阅就绪不代表正在正常接收。' : null),
@@ -231,12 +263,12 @@ function render() {
     (overview.updated
       ? '基于最近 ' +
         overview.count +
-        ' 条未处理消息 · ' +
+        ' 条 · ' +
         new Date(overview.updated * 1000).toLocaleString('zh-CN', {
           timeZone: 'Asia/Shanghai',
           hour12: false,
         })
-      : '消息整理后自动更新，也可以点击重新总结。');
+      : '');
   renderTodos(active);
   const root = document.getElementById('messages');
   root.replaceChildren();
@@ -245,8 +277,7 @@ function render() {
   );
   const pending = visible.filter((message) => !message.handled);
   for (const message of pending) root.append(messageCard(message));
-  if (!pending.length)
-    root.append(el('div', '当前没有未处理消息。新消息到达后会自动出现。', 'empty'));
+  if (!pending.length) root.append(el('div', '没有待处理消息', 'empty'));
   const handled = visible.filter((message) => message.handled);
   if (handled.length) {
     const section = el('details', undefined, 'archive');
@@ -254,14 +285,21 @@ function render() {
     section.ontoggle = () => {
       showHandled = section.open;
     };
-    section.append(el('summary', '已处理（' + handled.length + '） · 已投递消息已收起'));
+    const summary = el('summary', '已处理');
+    summary.append(el('span', String(handled.length), 'count'));
+    section.append(summary);
     for (const message of handled) section.append(messageCard(message));
     root.append(section);
   }
-  document.getElementById('updated').textContent =
-    '更新于 ' +
-    (status.updated || '刚刚') +
-    ' · 展示最近 100 条消息；回复和待办仅在你确认后写入钉钉。';
+  updated(status);
+}
+function updated(status) {
+  const node = document.getElementById('updated');
+  node.textContent = String(status.updated || '刚刚').replace(
+    /^\d{4}-\d{2}-\d{2} (\d{2}:\d{2}:\d{2}).*$/,
+    '$1',
+  );
+  node.title = (status.updated || '') + ' · 最近 100 条';
 }
 async function refresh() {
   if (loading) return;
@@ -284,9 +322,7 @@ async function refresh() {
       if (active && active.tagName === 'TEXTAREA') return;
       last = signature;
       render();
-    } else
-      document.getElementById('updated').textContent =
-        '更新于 ' + (next.status.updated || '刚刚') + ' · 展示最近 100 条消息；仅确认后写入钉钉。';
+    } else updated(next.status);
   } catch (e) {
     error(e.message);
   } finally {
@@ -296,16 +332,21 @@ async function refresh() {
 document.getElementById('tabs').onclick = (event) => {
   if (!event.target.dataset.filter) return;
   filter = event.target.dataset.filter;
-  document
-    .querySelectorAll('nav button')
-    .forEach((node) => node.classList.toggle('active', node.dataset.filter === filter));
+  document.querySelectorAll('nav button').forEach((node) => {
+    node.classList.toggle('active', node.dataset.filter === filter);
+    node.setAttribute('aria-pressed', String(node.dataset.filter === filter));
+  });
   render();
 };
-document.getElementById('refresh-overview').onclick = async () => {
+document.getElementById('refresh-overview').onclick = async (event) => {
+  const node = event.currentTarget;
+  node.setAttribute('aria-busy', 'true');
   try {
     await action('overview', {});
   } catch (e) {
     error(e.message);
+  } finally {
+    node.removeAttribute('aria-busy');
   }
 };
 document.getElementById('todo-cancel').onclick = () => {
@@ -319,6 +360,7 @@ document.getElementById('todo-form').onsubmit = async (event) => {
   if (!target || !title) return;
   const submit = document.getElementById('todo-submit');
   submit.disabled = true;
+  submit.setAttribute('aria-busy', 'true');
   try {
     await action(target.id ? 'todo' : 'todo-manual', Object.assign({}, target, { title }));
     pendingTodo = null;
@@ -327,7 +369,33 @@ document.getElementById('todo-form').onsubmit = async (event) => {
     document.getElementById('todo-dialog-error').textContent = e.message;
   } finally {
     submit.disabled = false;
+    submit.removeAttribute('aria-busy');
   }
 };
+// Theme: the head script applies the saved choice before first paint; this wires the swatches.
+const THEME_KEY = 'dte-panel-theme';
+function markTheme(name) {
+  for (const pick of document.querySelectorAll('[data-theme-pick]'))
+    pick.setAttribute('aria-pressed', String(pick.dataset.themePick === name));
+}
+function setTheme(name) {
+  const root = document.documentElement;
+  if (root.dataset.theme === name) return;
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    root.classList.add('theme-shift');
+    clearTimeout(setTheme.timer);
+    setTheme.timer = setTimeout(() => root.classList.remove('theme-shift'), 400);
+  }
+  root.dataset.theme = name;
+  markTheme(name);
+  try {
+    localStorage.setItem(THEME_KEY, name);
+  } catch {
+    // Storage blocked: the theme still applies for this visit.
+  }
+}
+for (const pick of document.querySelectorAll('[data-theme-pick]'))
+  pick.onclick = () => setTheme(pick.dataset.themePick);
+markTheme(document.documentElement.dataset.theme || 'kargul');
 refresh();
 setInterval(refresh, 1500);

@@ -1,66 +1,147 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="kargul">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
     <title>钉钉消息助手</title>
+    <script nonce="__TOKEN__">
+      try {
+        var t = localStorage.getItem('dte-panel-theme');
+        if (/^(kargul|dark|paper|mono|lilac)$/.test(t)) document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
     <link rel="stylesheet" href="/panel.css" />
   </head>
   <body>
-    <aside>
-      <div class="brand">消息助手<span class="brand-dot"> ·</span></div>
-      <div class="hint">把找你的事，放在一起。</div>
-      <nav id="tabs">
-        <button data-filter="all" class="active">全部消息</button
-        ><button data-filter="direct">谁找我</button><button data-filter="at">谁 @我</button
-        ><button data-filter="ued">关注群</button>
-      </nav>
-      <div class="bottom hint">只关注消息，不接入 OA 审批。<br />回复由你确认后发送。</div>
-    </aside>
-    <main>
-      <header>
-        <div class="eyebrow">YOUR INBOX, WITH CONTEXT</div>
-        <h1>值得你留意的消息</h1>
-        <p>新消息会自动出现。先看原文和建议，修改后再确认发送。</p>
-      </header>
-      <div class="stats">
-        <div class="stat"><span>消息监听</span><strong id="listening">连接中</strong></div>
-        <div class="stat"><span>Codex</span><strong id="agent">连接中</strong></div>
-        <div class="stat"><span>待审草稿</span><strong id="pending">0</strong></div>
-        <div class="stat"><span>待办建议</span><strong id="todo-count">0</strong></div>
-      </div>
-      <p id="listener-note" class="small"></p>
-      <div id="error" hidden></div>
-      <div class="overview-grid">
-        <section class="overview-box">
-          <div class="section-title">
-            <h2>AI 总结</h2>
-            <button id="refresh-overview">重新总结</button>
+    <div class="app">
+      <header class="bar">
+        <div class="brand">消息助手</div>
+        <div class="bar-end">
+          <div id="status" class="status" data-state="starting" role="status">
+            <span class="dot" aria-hidden="true"></span><span id="listening">连接中</span
+            ><span class="sep" aria-hidden="true">·</span>Codex <span id="agent">连接中</span>
           </div>
-          <div id="overview-text" class="summary">正在读取总结…</div>
-          <p id="overview-note" class="small"></p>
+          <div id="themes" class="themes" role="group" aria-label="主题">
+            <button type="button" data-theme-pick="kargul" aria-label="浅色" title="浅色"></button
+            ><button type="button" data-theme-pick="dark" aria-label="深色" title="深色"></button
+            ><button type="button" data-theme-pick="paper" aria-label="纸本" title="纸本"></button
+            ><button type="button" data-theme-pick="mono" aria-label="等宽" title="等宽"></button
+            ><button type="button" data-theme-pick="lilac" aria-label="淡紫" title="淡紫"></button>
+          </div>
+        </div>
+      </header>
+      <main class="list">
+        <div class="list-head">
+          <h1>待处理</h1>
+          <span class="count" data-n="0"><span id="pending">0</span> 待审</span>
+          <nav id="tabs" class="segmented" aria-label="消息来源">
+            <button data-filter="all" class="active" aria-pressed="true">全部</button
+            ><button data-filter="direct" aria-pressed="false">单聊</button
+            ><button data-filter="at" aria-pressed="false">@我</button
+            ><button data-filter="ued" aria-pressed="false">关注群</button>
+          </nav>
+        </div>
+        <div id="error" role="alert" hidden></div>
+        <div id="messages">
+          <div class="skeleton" aria-hidden="true">
+            <article>
+              <span class="sk-time"></span>
+              <div>
+                <span class="sk-line short"></span><span class="sk-line"></span
+                ><span class="sk-block"></span>
+              </div>
+            </article>
+            <article>
+              <span class="sk-time"></span>
+              <div>
+                <span class="sk-line short"></span><span class="sk-line"></span
+                ><span class="sk-block"></span>
+              </div>
+            </article>
+            <article>
+              <span class="sk-time"></span>
+              <div><span class="sk-line short"></span><span class="sk-line mid"></span></div>
+            </article>
+          </div>
+        </div>
+      </main>
+      <aside class="rail">
+        <section class="section overview">
+          <div class="section-head">
+            <h2>总结</h2>
+            <button
+              id="refresh-overview"
+              class="icon"
+              type="button"
+              aria-label="重新总结"
+              title="重新总结"
+            >
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                <path
+                  d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+          <div id="overview-text" class="overview-text">
+            <span class="sk-line"></span><span class="sk-line"></span
+            ><span class="sk-line short"></span>
+          </div>
+          <p id="overview-note" class="meta-line"></p>
         </section>
-        <section class="overview-box">
-          <div class="section-title"><h2>发现的待办</h2></div>
+        <section class="section todos">
+          <div class="section-head">
+            <h2>待办 <span id="todo-count" class="count">0</span></h2>
+          </div>
           <div id="todo-list"></div>
-          <p class="small">确认后添加到我的钉钉待办，不自动设置截止时间。</p>
         </section>
-      </div>
-      <div class="section-title"><h2>待处理消息</h2></div>
-      <p class="section-note">长连接实时接收单聊、@我和关注群消息；AI 按批次整理。</p>
-      <div id="messages"></div>
-      <div class="footer" id="updated">正在读取消息…</div>
-    </main>
-    <dialog id="todo-dialog">
+        <section class="section foot">
+          <div class="section-head"><h2>实时接收</h2></div>
+          <dl id="listener-note" class="kv">
+            <div>
+              <dt>单聊</dt>
+              <dd><span class="sk-line tiny"></span></dd>
+            </div>
+            <div>
+              <dt>@我</dt>
+              <dd><span class="sk-line tiny"></span></dd>
+            </div>
+            <div>
+              <dt>关注群</dt>
+              <dd><span class="sk-line tiny"></span></dd>
+            </div>
+          </dl>
+          <dl class="kv">
+            <div>
+              <dt>更新</dt>
+              <dd id="updated">读取中</dd>
+            </div>
+          </dl>
+        </section>
+      </aside>
+    </div>
+    <dialog id="todo-dialog" aria-labelledby="todo-dialog-title">
       <form id="todo-form">
-        <h2>添加到我的钉钉待办</h2>
-        <label for="todo-title">待办标题</label
-        ><input id="todo-title" name="title" maxlength="200" required autocomplete="off" />
-        <p class="small">确认后创建到你自己的钉钉待办，不设置截止时间。</p>
-        <p id="todo-dialog-error" class="dialog-error"></p>
+        <h2 id="todo-dialog-title">添加到钉钉待办</h2>
+        <label for="todo-title" class="visually-hidden">待办标题</label
+        ><input
+          id="todo-title"
+          name="title"
+          maxlength="200"
+          required
+          autocomplete="off"
+          placeholder="待办标题"
+        />
+        <p id="todo-dialog-error" class="dialog-error" role="alert"></p>
         <div class="actions">
           <button type="button" id="todo-cancel">取消</button
-          ><button type="submit" id="todo-submit" class="primary">确认添加</button>
+          ><button type="submit" id="todo-submit" class="primary">添加</button>
         </div>
       </form>
     </dialog>
