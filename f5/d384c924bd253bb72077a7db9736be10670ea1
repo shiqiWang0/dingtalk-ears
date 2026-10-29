@@ -1,0 +1,23 @@
+tests/test_web.py
+  h_0c940a947252a6 103-108
+backend/static/index.html
+  h_0c940a947252a6 7,12-27
+  h_0c940a947252a6 28
+backend/distribution.py
+  h_0c940a947252a6 35
+backend/static/panel.css
+  h_0c940a947252a6 73-79,84-98
+backend/web.py
+  h_0c940a947252a6 24-26,71-72,78-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f5d384c924bd253bb72077a7db9736be10670ea1",
+  "prompts": {},
+  "humans": {
+    "h_0c940a947252a6": {
+      "author": "liuyi <liuyi@dtstack.com>"
+    }
+  }
+}
