@@ -1,0 +1,16 @@
+backend/static/panel.css
+  h_0c940a947252a6 157-219,226-232,234-237,239-240,244-247,386-391
+backend/static/panel.js
+  h_0c940a947252a6 29-42,46,292-303,406-411
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "faac02f07ac3917c5e69529911939717ce87930b",
+  "prompts": {},
+  "humans": {
+    "h_0c940a947252a6": {
+      "author": "liuyi <liuyi@dtstack.com>"
+    }
+  }
+}
