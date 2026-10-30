@@ -62,7 +62,12 @@ class ListenerManager:
                     raw = json.loads(line)
                     self.status["listeners"][source]["raw_received"] += 1
                     self.status["listeners"][source]["last_received"] = now_text()
-                    value = normalize(raw, source, self.config.self_id, self.config.group_id)
+                    value = normalize(
+                        raw,
+                        source,
+                        self.config.self_id,
+                        self.config.group_ids,
+                    )
                     if value:
                         self.status["listeners"][source]["accepted"] += 1
                         self.inbox.put(value)

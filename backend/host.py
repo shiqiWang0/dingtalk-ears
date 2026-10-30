@@ -11,7 +11,8 @@ import threading
 import time
 
 from .appserver import AppServer
-from .config import bind_state
+from .config import add_group, bind_state, configured_groups, remove_group
+from .dingtalk import list_joined_groups
 from .listeners import ListenerManager
 from .panel_store import PanelStore
 from .queue_store import Store
@@ -39,7 +40,8 @@ class Host:
             "ai_provider": config.ai_provider,
             "panel_url": config.panel_url,
             "group_name": config.group_name,
-            "listener_count": 3,
+            "group_names": {},
+            "listener_count": 2 + len(config.watched_groups),
             "error": None,
             "received": 0,
         }
@@ -63,7 +65,7 @@ class Host:
             self.config.state_dir / "agent",
             executable=self.config.codex,
             display_name=self.config.display_name,
-            group_name=self.config.group_name,
+            group_name="、".join(name for unused, name in self.config.watched_groups),
         )
 
     def generate(self, batch):
@@ -153,7 +155,15 @@ class Host:
         self.overview_requested = self.panel.get_overview()["updated"] is None
         for message in store.history():
             self.panel.receive(message)
-        server = start_panel(self.panel, lambda: self.status, self.controls.put)
+        server = start_panel(
+            self.panel,
+            lambda: self.status,
+            self.controls.put,
+            groups=lambda: configured_groups(self.config.config_path),
+            add_group=lambda group_id, name: add_group(self.config.config_path, group_id, name),
+            remove_group=lambda group_id: remove_group(self.config.config_path, group_id),
+            available_groups=lambda: list_joined_groups(self.config),
+        )
         actual_port = server.server_address[1]
         url = f"http://127.0.0.1:{actual_port}/"
         # 换行打印面板访问地址
@@ -183,11 +193,15 @@ class Host:
                 "# 钉钉消息摘要\n\n等待接通后收到的新消息。只整理，不自动回复。\n", encoding="utf-8"
             )
         try:
-            for source, args in [
+            subscriptions = [
                 ("direct", ["--kind", "all-direct"]),
                 ("at", ["--kind", "at-me"]),
-                ("ued", ["--kind", "group", "--chat-id", self.config.group_id]),
-            ]:
+            ]
+            for index, (group_id, group_name) in enumerate(self.config.watched_groups):
+                source = "ued" if index == 0 else "group-{}".format(index)
+                self.status["group_names"][source] = group_name
+                subscriptions.append((source, ["--kind", "group", "--chat-id", group_id]))
+            for source, args in subscriptions:
                 if self.stop.is_set():
                     break
                 self.listeners.start(source, args)

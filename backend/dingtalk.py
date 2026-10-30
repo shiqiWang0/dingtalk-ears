@@ -4,6 +4,23 @@ import json
 import subprocess
 
 
+def list_joined_groups(config):
+    result = subprocess.run(
+        [config.dws, "chat", "+my-groups", "--page-all", "--profile", config.profile, "--format", "json"],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=30,
+    )
+    if result.returncode:
+        raise ValueError("无法读取钉钉群列表，请检查登录状态")
+    value = json.loads(result.stdout)
+    if not value.get("complete"):
+        raise ValueError("钉钉群列表未完整返回，请稍后重试")
+    return [
+        {"id": item["conversationId"], "name": item["name"]}
+        for item in value.get("groups", [])
+        if item.get("conversationId") and item.get("name")
+    ]
+
+
 def build_send_command(draft, message, text, config):
     cmd = [config.dws, "chat", "+messages-send", "--as", "user", "--profile", config.profile]
     if "direct" in message["sources"]:

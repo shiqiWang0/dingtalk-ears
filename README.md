@@ -1,6 +1,6 @@
 # 钉钉消息助手
 
-把单聊、@我和一个指定群的新消息汇集到本地面板，由 Codex 生成摘要、回复草稿和待办建议。**回复和待办需本人确认后执行**
+把单聊、@我和多个关注群的新消息汇集到本地面板，由 Codex 生成摘要、回复草稿和待办建议。**回复和待办需本人确认后执行**
 
 Python 标准库 + 原生网页，无第三方 Python 运行依赖，无需构建前端。支持 macOS/Linux；macOS 可安装登录启动项。
 
@@ -13,7 +13,7 @@ Python 标准库 + 原生网页，无第三方 Python 运行依赖，无需构�
 python3 -m backend init --output config.local.json
 ```
 
-填写 `profile`、本人 `self_id`（openDingTalkId）、`display_name`、`group.id` 和 `group.name`，再执行：
+填写 `profile`、本人 `self_id`（openDingTalkId）和 `display_name`；关注群可在本地面板中管理，再执行：
 
 ```sh
 python3 -m backend --config config.local.json doctor
@@ -21,6 +21,8 @@ python3 -m backend --config config.local.json run
 ```
 
 打开 [本地面板](http://127.0.0.1:8766/)（默认端口），前台按 Ctrl+C 停止。下次直接执行 `run`；已有后台实例时直接打开面板。交给 Agent 启动或维护时先读 [AGENTS.md](AGENTS.md)。
+
+在“关注群”区域点击“添加关注群”，可按名称搜索并多选群；选中的群以标签显示，可单独移除。下拉列表最高显示 300px，超过时在列表内滚动；确认保存后会写入本机配置，重启服务后生效。
 
 macOS 持续后台运行：先退出前台实例，再执行：
 

@@ -10,8 +10,10 @@ EVENTS = {
 }
 
 
-def normalize(raw, source, self_id, group_id):
-    if source not in EVENTS or not isinstance(raw, dict):
+def normalize(raw, source, self_id, group_ids=()):
+    group_ids = set(group_ids)
+    group_source = source == "ued" or source.startswith("group-")
+    if (source not in EVENTS and not group_source) or not isinstance(raw, dict):
         return None
     value = raw
     for unused in range(5):
@@ -34,7 +36,7 @@ def normalize(raw, source, self_id, group_id):
         return None
     cid = str(value.get("conversation_id") or value.get("conversationId") or "")
     sid = str(value.get("sender_open_dingtalk_id") or value.get("senderOpenDingtalkId") or "")
-    if sid == self_id or (source == "ued" and cid != group_id):
+    if sid == self_id or (group_source and cid not in group_ids):
         return None
     text = value.get("content")
     if text is None:

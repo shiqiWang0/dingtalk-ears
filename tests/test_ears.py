@@ -15,7 +15,7 @@ class EarsTests(unittest.TestCase):
             GROUP="group-test",
             SELF="self-test",
             Store=Store,
-            normalize=partial(normalize, self_id="self-test", group_id="group-test"),
+            normalize=partial(normalize, self_id="self-test", group_ids=("group-test",)),
         )
         self.tmp = tempfile.TemporaryDirectory()
         self.store = self.m.Store(Path(self.tmp.name) / "queue.db")
@@ -62,6 +62,15 @@ class EarsTests(unittest.TestCase):
         self.assertIsNone(self.event("ued", "another-group"))
         self.assertIsNone(
             self.m.normalize({"sender_open_dingtalk_id": self.m.SELF, "content": "自己"}, "direct")
+        )
+
+    def test_accepts_each_configured_group(self):
+        self.assertIsNotNone(
+            self.m.normalize(
+                {"conversation_id": "second-group", "content": "额外群消息"},
+                "group-1",
+                group_ids=(self.m.GROUP, "second-group"),
+            )
         )
 
     def test_duplicate_channels_merge_and_promote_mention(self):

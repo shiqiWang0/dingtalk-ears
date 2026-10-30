@@ -15,6 +15,36 @@ from backend.web import start_panel
 
 
 class WebTests(unittest.TestCase):
+    def test_group_management_updates_panel_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = PanelStore(Path(directory) / "panel.db", SimpleNamespace(port=8766))
+            groups = [{"id": "primary", "name": "默认群", "primary": True}]
+
+            def add(group_id, name):
+                groups.append({"id": group_id, "name": name, "primary": False})
+
+            def remove(group_id):
+                groups[:] = [group for group in groups if group["id"] != group_id]
+
+            server = start_panel(
+                store, lambda: {}, lambda key: None, port=0, groups=lambda: groups, add_group=add, remove_group=remove
+            )
+            connection = http.client.HTTPConnection("127.0.0.1", server.server_address[1])
+            try:
+                connection.request("GET", "/")
+                token = re.search('nonce="([^"]+)"', connection.getresponse().read().decode()).group(1)
+                headers = {"Origin": "http://127.0.0.1:" + str(server.server_address[1]), "X-Panel-Token": token, "Content-Type": "application/json"}
+                connection.request("POST", "/api/groups", json.dumps({"id": "extra", "name": "研发群"}), headers)
+                self.assertEqual(connection.getresponse().status, 202)
+                connection.request("POST", "/api/groups/remove", json.dumps({"id": "extra"}), headers)
+                self.assertEqual(connection.getresponse().status, 202)
+                connection.request("GET", "/api/state")
+                self.assertEqual(json.loads(connection.getresponse().read())["groups"], groups)
+            finally:
+                connection.close()
+                server.shutdown()
+                server.server_close()
+
     def test_candidate_and_manual_todos_share_confirmation_and_duplicate_protection(self):
         with tempfile.TemporaryDirectory() as directory:
             store = PanelStore(

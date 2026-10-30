@@ -129,6 +129,27 @@ function clean(text) {
     .replace(/\[图片消息\]\(mediaId=[^)]*\)/g, '[图片消息，暂未识别]')
     .replace('注意：如需下载使用dws chat message download-media命令下载', '');
 }
+function isGroupSource(source) {
+  return source === 'ued' || source.startsWith('group-');
+}
+function groupNames(status) {
+  return status.group_names || { ued: status.group_name || '关注群' };
+}
+function sourceName(source) {
+  return { direct: '单聊', at: '@我' }[source] || groupNames(snapshot.status)[source] || source;
+}
+function renderGroups(groups) {
+  const root = document.getElementById('group-list');
+  root.replaceChildren();
+  for (const group of groups || []) {
+    const item = el('div', undefined, 'group-item');
+    item.append(el('div', group.name, 'group-name'), el('div', group.id, 'group-id'));
+    item.append(button('删除', async () => {
+      if (confirm('停止关注「' + group.name + '」？重启服务后生效。')) await action('groups/remove', { id: group.id });
+    }));
+    root.append(item);
+  }
+}
 let pendingTodo = null;
 function openTodo(target) {
   pendingTodo = target;
@@ -179,8 +200,7 @@ function messageCard(message) {
     meta.append(
       el(
         'span',
-        { direct: '单聊', at: '@我', ued: snapshot.status.group_name || '关注群' }[source] ||
-          source,
+        sourceName(source),
         'tag',
       ),
     );
@@ -287,7 +307,7 @@ function render() {
       item.state === 'stopped',
   );
   const expected = status.listener_count || 3;
-  document.querySelector('[data-filter=ued]').textContent = status.group_name || '关注群';
+  document.querySelector('[data-filter=groups]').textContent = '关注群';
   const ready = Object.values(status.listeners || {}).filter(
     (item) => item.state === 'ready',
   ).length;
@@ -312,9 +332,7 @@ function render() {
     ' 条，@我 ' +
     (counts.at || 0) +
     ' 条，' +
-    (status.group_name || '关注群') +
-    ' ' +
-    (counts.ued || 0) +
+    Object.entries(groupNames(status)).map(([source, name]) => name + ' ' + (counts[source] || 0) + ' 条').join('，') +
     ' 条。历史补读不计入实时接收；订阅就绪不代表已验证群事件投递。';
   const agentLabel = document.getElementById('agent-label');
   if (agentLabel) {
@@ -350,10 +368,11 @@ function render() {
         })
       : '消息整理后自动更新，也可以点击重新总结。');
   renderTodos(active);
+  renderGroups(snapshot.groups);
   const root = document.getElementById('messages');
   root.replaceChildren();
   const visible = snapshot.messages.filter(
-    (message) => filter === 'all' || message.sources.includes(filter),
+    (message) => filter === 'all' || message.sources.includes(filter) || (filter === 'groups' && message.sources.some(isGroupSource)),
   );
   const pending = visible.filter((message) => !message.handled);
   for (const message of pending) root.append(messageCard(message));
@@ -389,6 +408,7 @@ async function refresh() {
       next.status.error,
       next.status.appserver,
       next.status.listeners,
+      next.groups,
     ]);
     const prevCount = generatingMessages.size;
     checkGeneratingStatus(next);
@@ -438,6 +458,104 @@ document.getElementById('todo-cancel').onclick = () => {
   pendingTodo = null;
   document.getElementById('todo-dialog').close();
 };
+document.getElementById('add-group').onclick = () => {
+  document.getElementById('group-form').reset();
+  selectedGroups.clear();
+  renderSelectedGroups();
+  closeGroupOptions();
+  document.getElementById('group-dialog-error').textContent = '';
+  document.getElementById('group-dialog').showModal();
+  loadAvailableGroups();
+};
+document.getElementById('group-cancel').onclick = () => document.getElementById('group-dialog').close();
+document.getElementById('group-form').onsubmit = async (event) => {
+  event.preventDefault();
+  try {
+    if (!selectedGroups.size) throw Error('请至少选择一个群');
+    for (const group of selectedGroups.values()) {
+      await action('groups', { id: group.id, name: group.name });
+    }
+    document.getElementById('group-dialog').close();
+  } catch (e) {
+    document.getElementById('group-dialog-error').textContent = e.message;
+  }
+};
+let availableGroups = [];
+const selectedGroups = new Map();
+
+function closeGroupOptions() {
+  const input = document.getElementById('group-search');
+  document.getElementById('group-options').hidden = true;
+  input.setAttribute('aria-expanded', 'false');
+}
+
+function renderSelectedGroups() {
+  const selection = document.getElementById('group-selection');
+  selection.replaceChildren();
+  for (const group of selectedGroups.values()) {
+    const tag = el('span', undefined, 'group-selection-tag');
+    const remove = el('button', '×', 'group-selection-remove');
+    remove.type = 'button';
+    remove.setAttribute('aria-label', '移除 ' + group.name);
+    remove.onclick = (event) => {
+      event.stopPropagation();
+      selectedGroups.delete(group.id);
+      renderSelectedGroups();
+      renderAvailableGroups(document.getElementById('group-search').value);
+    };
+    tag.append(document.createTextNode(group.name), remove);
+    selection.append(tag);
+  }
+}
+
+function toggleGroup(group) {
+  if (selectedGroups.has(group.id)) selectedGroups.delete(group.id);
+  else selectedGroups.set(group.id, group);
+  renderSelectedGroups();
+  document.getElementById('group-dialog-error').textContent = '';
+  renderAvailableGroups(document.getElementById('group-search').value);
+}
+
+function renderAvailableGroups(query = '') {
+  const options = document.getElementById('group-options');
+  const input = document.getElementById('group-search');
+  const normalizedQuery = query.trim().toLowerCase();
+  const groups = availableGroups.filter((item) => item.name.toLowerCase().includes(normalizedQuery));
+  options.replaceChildren();
+  for (const group of groups) {
+    const option = el('li', group.name, 'group-option');
+    option.setAttribute('role', 'option');
+    option.setAttribute('aria-selected', String(selectedGroups.has(group.id)));
+    option.onclick = (event) => {
+      event.stopPropagation();
+      toggleGroup(group);
+    };
+    options.append(option);
+  }
+  if (!groups.length) options.append(el('li', '没有匹配的群', 'group-option-empty'));
+  options.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
+}
+async function loadAvailableGroups() {
+  try {
+    const response = await fetch('/api/groups/available', { cache: 'no-store' });
+    const value = await response.json();
+    if (!response.ok) throw Error(value.error || '无法读取群列表');
+    availableGroups = value.groups || [];
+    renderAvailableGroups(document.getElementById('group-search').value);
+  } catch (e) { document.getElementById('group-dialog-error').textContent = e.message; }
+}
+document.getElementById('group-search').oninput = (event) => {
+  renderAvailableGroups(event.target.value);
+};
+document.getElementById('group-search').onfocus = (event) => renderAvailableGroups(event.target.value);
+document.getElementById('group-search').onclick = (event) => renderAvailableGroups(event.target.value);
+document.getElementById('group-search').onkeydown = (event) => {
+  if (event.key === 'Escape') closeGroupOptions();
+};
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.group-combobox')) closeGroupOptions();
+});
 document.getElementById('todo-form').onsubmit = async (event) => {
   event.preventDefault();
   const target = pendingTodo,

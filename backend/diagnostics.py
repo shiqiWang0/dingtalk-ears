@@ -136,11 +136,7 @@ def doctor(config):
     if marker.exists():
         try:
             owner = json.loads(marker.read_text(encoding="utf-8"))
-            same = owner == {
-                "profile": config.profile,
-                "self_id": config.self_id,
-                "group_id": config.group_id,
-            }
+            same = owner.get("profile") == config.profile and owner.get("self_id") == config.self_id
             record(
                 "状态归属", same, "身份匹配" if same else "此目录属于另一身份，请配置独立数据目录"
             )

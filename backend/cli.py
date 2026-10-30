@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .config import initialize, load_config
+from .config import initialize, load_config, migrate_legacy_config
 from .diagnostics import doctor, resolve_commands
 from .distribution import create_archive, launch_agent, save_launch_agent
 
@@ -45,6 +45,7 @@ def main(argv=None):
         elif args.command == "share":
             print(create_archive(Path(__file__).resolve().parent.parent, args.output))
         else:
+            migrate_legacy_config(args.config)
             config = load_config(args.config)
             if args.command == "doctor":
                 checks = doctor(config)

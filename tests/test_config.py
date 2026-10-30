@@ -22,7 +22,7 @@ class ConfigTests(unittest.TestCase):
             "profile": "corp:employee",
             "self_id": "open-person",
             "display_name": "同事",
-            "group": {"id": "cid-example", "name": "设计群"},
+            "groups": [{"id": "cid-example", "name": "设计群"}],
         }
 
     def load(self):
@@ -50,7 +50,7 @@ class ConfigTests(unittest.TestCase):
                     "profile": "corp:employee",
                     "self_id": "open-person",
                     "display_name": "同事",
-                    "group": {"id": "cid-example", "name": "设计群"},
+                    "groups": [{"id": "cid-example", "name": "设计群"}],
                 }
 
     def test_invalid_numbers_and_repeated_json_keys_are_rejected(self):
@@ -91,6 +91,17 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.load()
         self.value["ai_provider"] = "codex"
+
+    def test_extra_groups_are_validated_and_persisted(self):
+        self.value["groups"] = [{"id": "cid-extra", "name": "研发群"}]
+        config = self.load()
+        self.assertEqual(config.watched_groups, (("cid-extra", "研发群"),))
+        groups = self.module.add_group(self.path, "cid-new", "产品群")
+        self.assertEqual([item["name"] for item in groups], ["研发群", "产品群"])
+        self.module.remove_group(self.path, "cid-extra")
+        self.assertEqual(self.module.configured_groups(self.path)[0]["id"], "cid-new")
+        self.module.remove_group(self.path, "cid-new")
+        self.assertEqual(self.module.configured_groups(self.path), [])
 
     def test_state_cannot_be_reused_by_another_account(self):
         first = self.load()

@@ -30,7 +30,7 @@
       <nav id="tabs">
         <button data-filter="all" class="active">全部消息</button
         ><button data-filter="direct">谁找我</button><button data-filter="at">谁 @我</button
-        ><button data-filter="ued">关注群</button>
+        ><button data-filter="groups">关注群</button>
       </nav>
       <div class="bottom hint">只关注消息，不接入 OA 审批。<br />回复由你确认后发送。</div>
     </aside>
@@ -48,6 +48,11 @@
       </div>
       <p id="listener-note" class="small"></p>
       <div id="error" hidden></div>
+      <section class="group-manager">
+        <div class="section-title"><h2>关注群</h2><button id="add-group">添加关注群</button></div>
+        <div id="group-list"></div>
+        <p class="small">添加或删除会保存到本机配置；重启服务后开始或停止监听。</p>
+      </section>
       <div class="overview-grid">
         <section class="overview-box">
           <div class="section-title">
@@ -79,6 +84,27 @@
           <button type="button" id="todo-cancel">取消</button
           ><button type="submit" id="todo-submit" class="primary">确认添加</button>
         </div>
+      </form>
+    </dialog>
+    <dialog id="group-dialog">
+      <form id="group-form">
+        <h2>添加关注群</h2>
+        <label for="group-search">选择群</label>
+        <div class="group-combobox">
+          <div id="group-selection" class="group-selection"></div>
+          <input
+            id="group-search"
+            autocomplete="off"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-controls="group-options"
+            aria-expanded="false"
+            placeholder="输入群名称搜索"
+          />
+          <ul id="group-options" class="group-options" role="listbox" hidden></ul>
+        </div>
+        <p id="group-dialog-error" class="dialog-error"></p>
+        <div class="actions"><button type="button" id="group-cancel">取消</button><button type="submit" class="primary">保存关注群</button></div>
       </form>
     </dialog>
     <script nonce="__TOKEN__" src="/panel.js"></script>

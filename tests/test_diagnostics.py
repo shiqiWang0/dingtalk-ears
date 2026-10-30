@@ -38,7 +38,7 @@ else: sys.exit(2)
                         "profile": "corp:person",
                         "self_id": "known-open-id",
                         "display_name": "我",
-                        "group": {"id": "cid", "name": "设计"},
+                        "groups": [{"id": "cid", "name": "设计"}],
                         "commands": {"dws": str(cli), "codex": str(cli)},
                     }
                 )
@@ -76,7 +76,7 @@ else: sys.exit(2)
                         "profile": "corp:person",
                         "self_id": "known-open-id",
                         "display_name": "我",
-                        "group": {"id": "cid", "name": "设计"},
+                        "groups": [{"id": "cid", "name": "设计"}],
                         "ai_provider": "agy",
                         "commands": {"dws": str(cli), "agy": str(cli)},
                     }

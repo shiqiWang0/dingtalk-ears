@@ -243,6 +243,25 @@ header p {
   font-size: 12px;
 }
 
+.group-manager {
+  background: white;
+  border: 1px solid #dfe5dc;
+  border-radius: 14px;
+  margin: 0 0 28px;
+  padding: 20px 24px;
+}
+
+.group-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid #edf1eb;
+  padding: 12px 0;
+}
+
+.group-name { font-weight: 650; }
+.group-id { color: #71836e; font-size: 12px; overflow-wrap: anywhere; flex: 1; }
+
 #error {
   position: fixed;
   top: 16px;
@@ -560,6 +579,7 @@ dialog {
   border: 1px solid #d8e2d2;
   border-radius: 15px;
   padding: 28px;
+  overflow: visible;
   width: min(460px, 92vw);
   color: #30492f;
   box-shadow: 0 20px 80px #19351b33;
@@ -586,6 +606,132 @@ dialog input {
   padding: 12px;
   border: 1px solid #c8d6c1;
   border-radius: 8px;
+}
+
+.group-combobox {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 2px 30px 2px 4px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.group-combobox::after {
+  content: '';
+  position: absolute;
+  top: 11px;
+  right: 13px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid #00000073;
+  border-bottom: 1.5px solid #00000073;
+  pointer-events: none;
+  transform: rotate(45deg);
+}
+
+.group-combobox input[type='text'],
+.group-combobox input:not([type]) {
+  flex: 1;
+  width: auto;
+  min-width: 120px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0 7px;
+  border: 0;
+  color: #000000e0;
+  box-shadow: none;
+}
+
+.group-combobox:focus-within {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgb(5 145 255 / 10%);
+}
+
+.group-combobox input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.group-options {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  max-height: 300px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  background: #fff;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: 0 6px 16px 0 rgb(0 0 0 / 8%), 0 3px 6px -4px rgb(0 0 0 / 12%), 0 9px 28px 8px rgb(0 0 0 / 5%);
+}
+
+.group-option,
+.group-option-empty {
+  min-height: 32px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  color: #000000e0;
+  line-height: 22px;
+}
+
+.group-option {
+  cursor: pointer;
+}
+
+.group-option:hover,
+.group-option[aria-selected='true'] {
+  background: #e6f4ff;
+  color: #000000e0;
+}
+
+.group-option-empty {
+  color: #00000073;
+}
+
+.group-selection {
+  display: contents;
+}
+
+.group-selection-tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 4px;
+  height: 22px;
+  padding: 0 4px 0 7px;
+  color: #000000e0;
+  background: #f5f5f5;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.group-selection-remove {
+  min-width: 16px;
+  height: 16px;
+  padding: 0;
+  color: #00000073;
+  background: transparent;
+  border: 0;
+  border-radius: 2px;
+  font-size: 16px;
+  line-height: 14px;
+}
+
+.group-selection-remove:hover {
+  color: #000000e0;
+  background: transparent;
 }
 
 dialog .dialog-error {

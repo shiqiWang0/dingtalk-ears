@@ -58,7 +58,7 @@ class DistributionTests(unittest.TestCase):
                     "profile": "corp:user",
                     "self_id": "openid",
                     "display_name": "甲",
-                    "group": {"id": "group", "name": "设计"},
+                    "groups": [{"id": "group", "name": "设计"}],
                 }
             )
         )

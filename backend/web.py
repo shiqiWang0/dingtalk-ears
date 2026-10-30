@@ -9,7 +9,7 @@ from pathlib import Path
 from .dingtalk import create_todo, deliver
 
 
-def start_panel(store, status, regenerate, port=None):
+def start_panel(store, status, regenerate, port=None, groups=None, add_group=None, remove_group=None, available_groups=None):
     port = store.config.port if port is None else port
     static = Path(__file__).with_name("static")
     token = secrets.token_urlsafe(32)
@@ -87,8 +87,11 @@ def start_panel(store, status, regenerate, port=None):
                         "messages": store.snapshot(),
                         "status": status(),
                         "overview": store.get_overview(),
+                        "groups": groups() if groups else [],
                     },
                 )
+            if self.path == "/api/groups/available" and available_groups:
+                return self.reply(200, {"groups": available_groups()})
             self.reply(404, {"error": "不存在"})
 
         def do_POST(self):
@@ -142,6 +145,14 @@ def start_panel(store, status, regenerate, port=None):
                     regenerate(message["key"])
                 elif self.path == "/api/manual":
                     store.create_draft(body["key"], "手动回复", "", None)
+                elif self.path == "/api/groups":
+                    if not add_group:
+                        raise ValueError("关注群管理未启用")
+                    add_group(body["id"], body["name"])
+                elif self.path == "/api/groups/remove":
+                    if not remove_group:
+                        raise ValueError("关注群管理未启用")
+                    remove_group(body["id"])
                 else:
                     return self.reply(404, {"error": "不存在"})
                 self.reply(202, {"ok": True})
