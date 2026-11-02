@@ -1,0 +1,31 @@
+backend/panel_store.py
+  d69e98f3f409cff9 119-131
+backend/static/panel.css
+  d69e98f3f409cff9 823-841
+backend/static/panel.js
+  d69e98f3f409cff9 9,269-278,427,445-447,462,498-500,522-556
+backend/static/index.html
+  d69e98f3f409cff9 74-80
+backend/web.py
+  d69e98f3f409cff9 119-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "7b1776bc3848cae1b649da42fa617249d6d8cb94",
+  "prompts": {
+    "d69e98f3f409cff9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1861a-db30-7180-b202-4640995ee6a5",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Bell",
+      "messages": [],
+      "total_additions": 99,
+      "total_deletions": 6,
+      "accepted_lines": 174,
+      "overriden_lines": 0
+    }
+  }
+}
