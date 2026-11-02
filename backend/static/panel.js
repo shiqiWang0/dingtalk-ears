@@ -6,6 +6,7 @@ let filter = 'all',
   loading = false,
   last = '';
 const edits = new Map();
+let selectedMessages = new Set();
 const generatingMessages = new Map();
 const statuses = {
   pending: '待你审查',
@@ -265,6 +266,16 @@ function messageCard(message) {
   if (message.ingest_mode === 'history_backfill') meta.append(el('span', '历史补读', 'tag'));
   meta.append(el('span', String(message.time || '时间未提供'), 'time'));
   card.append(meta, el('div', clean(message.text), 'original'));
+  const select = el('input');
+  select.type = 'checkbox';
+  select.checked = selectedMessages.has(message.key);
+  select.setAttribute('aria-label', '选择 ' + message.sender + ' 的消息');
+  select.onchange = () => {
+    if (select.checked) selectedMessages.add(message.key);
+    else selectedMessages.delete(message.key);
+    updateBulkActions();
+  };
+  card.prepend(select);
   const draft = message.draft;
   if (draft)
     card.append(el('span', '消息整理', 'label'), el('div', draft.summary || '手动回复', 'summary'));
@@ -413,7 +424,7 @@ function render() {
           hour12: false,
         })
       : '消息整理后自动更新，也可以点击重新总结。');
-  renderTodos(active);
+  renderTodos(snapshot.messages);
   renderGroups(snapshot.groups);
   const root = document.getElementById('messages');
   root.replaceChildren();
@@ -431,6 +442,9 @@ function render() {
     );
   });
   const pending = visible.filter((message) => !message.handled);
+  selectedMessages = new Set(
+    [...selectedMessages].filter((key) => pending.some((m) => m.key === key)),
+  );
   for (const message of pending) root.append(messageCard(message));
   if (!pending.length)
     root.append(el('div', '当前没有未处理消息。新消息到达后会自动出现。', 'empty'));
@@ -445,6 +459,7 @@ function render() {
     for (const message of handled) section.append(messageCard(message));
     root.append(section);
   }
+  updateBulkActions(pending);
   document.getElementById('updated').textContent =
     '更新于 ' +
     (status.updated || '刚刚') +
@@ -480,9 +495,9 @@ async function refresh() {
       if (active && active.tagName === 'TEXTAREA') return;
       last = signature;
       render();
-    } else
-      document.getElementById('updated').textContent =
-        '更新于 ' + (next.status.updated || '刚刚') + ' · 展示最近 100 条消息；仅确认后写入钉钉。';
+    }
+    document.getElementById('updated').textContent =
+      '更新于 ' + (next.status.updated || '刚刚') + ' · 展示最近 100 条消息；仅确认后写入钉钉。';
   } catch (e) {
     error(e.message);
     const listeningEl = document.getElementById('listening');
@@ -503,6 +518,42 @@ document.getElementById('tabs').onclick = (event) => {
     .querySelectorAll('nav button')
     .forEach((node) => node.classList.toggle('active', node.dataset.filter === filter));
   render();
+};
+function updateBulkActions(pending) {
+  const messages = pending || (snapshot?.messages || []).filter((message) => !message.handled);
+  const selectAll = document.getElementById('select-all-messages');
+  selectAll.checked =
+    messages.length > 0 && messages.every((message) => selectedMessages.has(message.key));
+  selectAll.indeterminate = selectedMessages.size > 0 && !selectAll.checked;
+  document.getElementById('bulk-handle').disabled = selectedMessages.size === 0;
+}
+document.getElementById('select-all-messages').onchange = () => {
+  const visible = snapshot.messages.filter(
+    (message) =>
+      !message.handled &&
+      (selectedGroupId
+        ? message.conversation_id === selectedGroupId
+        : filter === 'all' ||
+          message.sources.includes(filter) ||
+          (filter === 'groups' &&
+            snapshot.groups.some((group) => group.id === message.conversation_id))),
+  );
+  selectedMessages = new Set(
+    document.getElementById('select-all-messages').checked
+      ? visible.map((message) => message.key)
+      : [],
+  );
+  render();
+};
+document.getElementById('bulk-handle').onclick = async () => {
+  const keys = [...selectedMessages];
+  if (!keys.length || !confirm('将 ' + keys.length + ' 条消息标记为已处理？')) return;
+  try {
+    await action('handled/bulk', { keys });
+    selectedMessages.clear();
+  } catch (e) {
+    error(e.message);
+  }
 };
 document.getElementById('refresh-overview').onclick = async () => {
   const btn = document.getElementById('refresh-overview');

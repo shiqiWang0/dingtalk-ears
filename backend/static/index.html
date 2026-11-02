@@ -71,7 +71,13 @@
           <p class="small">确认后添加到我的钉钉待办，不自动设置截止时间。</p>
         </section>
       </div>
-      <div class="section-title"><h2 id="messages-heading">待处理消息</h2></div>
+      <div class="section-title message-list-heading">
+        <h2 id="messages-heading">待处理消息</h2>
+        <div class="bulk-actions">
+          <label><input id="select-all-messages" type="checkbox" />全选</label
+          ><button id="bulk-handle" disabled>标记已处理</button>
+        </div>
+      </div>
       <p class="section-note">长连接实时接收单聊、@我和关注群消息；AI 按批次整理。</p>
       <div id="messages"></div>
       <div class="footer" id="updated">正在读取消息…</div>
