@@ -9,6 +9,7 @@ import subprocess
 import sys
 import threading
 import time
+from dataclasses import replace
 
 from .appserver import AppServer
 from .config import add_group, bind_state, configured_groups, remove_group
@@ -28,6 +29,8 @@ class Host:
         self.inbox = queue.Queue()
         self.results = queue.Queue()
         self.controls = queue.Queue()
+        self.group_sources = {}
+        self.next_group_source = len(config.watched_groups)
         self.agent = None
         self.overview_requested = False
 
@@ -41,6 +44,8 @@ class Host:
             "panel_url": config.panel_url,
             "group_name": config.group_name,
             "group_names": {},
+            "group_conversations": {},
+            "groups_error": None,
             "listener_count": 2 + len(config.watched_groups),
             "error": None,
             "received": 0,
@@ -48,6 +53,41 @@ class Host:
         self.listeners = ListenerManager(config, self.status, self.inbox, self.stop)
         self.busy = False
         self.paused = False
+
+    def change_group(self, operation, *args):
+        groups = operation(self.config.config_path, *args)
+        self.controls.put("__groups__")
+        return groups
+
+    def sync_groups(self):
+        """Reconcile saved groups on the host thread without restarting other services."""
+        groups = configured_groups(self.config.config_path)
+        wanted = {group["id"]: group["name"] for group in groups}
+        for group_id, source in list(self.group_sources.items()):
+            if group_id not in wanted:
+                self.listeners.remove(source)
+                del self.group_sources[group_id]
+                self.status["group_names"].pop(source, None)
+                self.status["group_conversations"].pop(source, None)
+                if (self.status["error"] or "").startswith(source + " listener stopped;"):
+                    self.status["error"] = None
+        for group_id, name in wanted.items():
+            source = self.group_sources.get(group_id)
+            if source is None:
+                source = "group-{}".format(self.next_group_source)
+                self.next_group_source += 1
+                self.listeners.start(
+                    source, ["--kind", "group", "--chat-id", group_id], group_ids=(group_id,)
+                )
+                self.group_sources[group_id] = source
+            self.status["group_names"][source] = name
+            self.status["group_conversations"][source] = group_id
+        self.config = replace(self.config, groups=tuple(wanted.items()))
+        self.status["group_name"] = self.config.group_name
+        self.status["listener_count"] = 2 + len(wanted)
+        self.status["groups_error"] = None
+        if self.agent:
+            self.agent.context["watched_group"] = self.config.group_name
 
     def create_agent(self):
         # 根据配置的 ai_provider 选用对应的生成器
@@ -160,8 +200,8 @@ class Host:
             lambda: self.status,
             self.controls.put,
             groups=lambda: configured_groups(self.config.config_path),
-            add_group=lambda group_id, name: add_group(self.config.config_path, group_id, name),
-            remove_group=lambda group_id: remove_group(self.config.config_path, group_id),
+            add_group=lambda group_id, name: self.change_group(add_group, group_id, name),
+            remove_group=lambda group_id: self.change_group(remove_group, group_id),
             available_groups=lambda: list_joined_groups(self.config),
         )
         actual_port = server.server_address[1]
@@ -199,12 +239,15 @@ class Host:
             ]
             for index, (group_id, group_name) in enumerate(self.config.watched_groups):
                 source = "ued" if index == 0 else "group-{}".format(index)
+                self.group_sources[group_id] = source
+                self.status["group_conversations"][source] = group_id
                 self.status["group_names"][source] = group_name
                 subscriptions.append((source, ["--kind", "group", "--chat-id", group_id]))
             for source, args in subscriptions:
                 if self.stop.is_set():
                     break
-                self.listeners.start(source, args)
+                group_id = self.status["group_conversations"].get(source)
+                self.listeners.start(source, args, group_ids=(group_id,) if group_id else None)
                 # Serialize subscription setup to avoid racing creation of the shared bus.
                 until = time.monotonic() + 45
                 while (
@@ -223,6 +266,11 @@ class Host:
                     )
                 try:
                     message = self.inbox.get(timeout=1)
+                    if (
+                        not set(message["sources"]) & {"direct", "at"}
+                        and message["conversation_id"] not in self.config.group_ids
+                    ):
+                        continue
                     store.add(message, time.time())
                     self.panel.receive(message)
                     self.status["received"] += 1
@@ -230,6 +278,12 @@ class Host:
                     pass
                 try:
                     key = self.controls.get_nowait()
+                    if key == "__groups__":
+                        try:
+                            self.sync_groups()
+                        except Exception as error:
+                            self.status["groups_error"] = "关注群监听更新失败：" + str(error)
+                        continue
                     if key == "__overview__":
                         self.overview_requested = True
                     else:

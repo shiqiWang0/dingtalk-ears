@@ -133,11 +133,37 @@ function clean(text) {
 function isGroupSource(source) {
   return source === 'ued' || source.startsWith('group-');
 }
-function groupNames(status) {
-  return status.group_names || { ued: status.group_name || '关注群' };
+function sourceName(source, message) {
+  if (isGroupSource(source)) {
+    const group = (snapshot.groups || []).find((item) => item.id === message.conversation_id);
+    return group?.name || '已取消关注的群';
+  }
+  return { direct: '单聊', at: '@我' }[source] || source;
 }
-function sourceName(source) {
-  return { direct: '单聊', at: '@我' }[source] || groupNames(snapshot.status)[source] || source;
+function listenerNote(status, groups = []) {
+  const listeners = status.listeners || {};
+  const counts = [
+    '单聊 ' + (listeners.direct?.accepted || 0) + ' 条',
+    '@我 ' + (listeners.at?.accepted || 0) + ' 条',
+  ];
+  for (const group of groups) {
+    const source = Object.keys(status.group_conversations || {}).find(
+      (key) => status.group_conversations[key] === group.id,
+    );
+    const listener = listeners[source];
+    counts.push(
+      group.name +
+        ' ' +
+        (listener?.accepted || 0) +
+        ' 条' +
+        (!listener ? '（正在启动监听）' : listener.state !== 'ready' ? '（监听未就绪）' : ''),
+    );
+  }
+  return (
+    '本次进程实际接收：' +
+    counts.join('，') +
+    '。历史补读不计入实时接收；订阅就绪不代表已验证群事件投递。'
+  );
 }
 function renderGroups(groups = []) {
   if (selectedGroupId && !groups.some((group) => group.id === selectedGroupId)) {
@@ -170,7 +196,7 @@ function renderGroups(groups = []) {
     const remove = button(
       '×',
       async () => {
-        if (confirm('停止关注「' + group.name + '」？重启服务后停止监听。')) {
+        if (confirm('停止关注「' + group.name + '」？将停止接收该群的新消息。')) {
           await action('groups/remove', { id: group.id });
         }
       },
@@ -235,7 +261,7 @@ function messageCard(message) {
   const card = el('article'),
     meta = el('div', undefined, 'meta');
   meta.append(el('span', message.sender, 'name'));
-  for (const source of message.sources) meta.append(el('span', sourceName(source), 'tag'));
+  for (const source of message.sources) meta.append(el('span', sourceName(source, message), 'tag'));
   if (message.ingest_mode === 'history_backfill') meta.append(el('span', '历史补读', 'tag'));
   meta.append(el('span', String(message.time || '时间未提供'), 'time'));
   card.append(meta, el('div', clean(message.text), 'original'));
@@ -338,7 +364,7 @@ function render() {
       ['degraded', 'error', 'disconnected'].includes(item.transport?.state) ||
       item.state === 'stopped',
   );
-  const expected = status.listener_count || 3;
+  const expected = status.listener_count ?? 2 + (snapshot.groups || []).length;
   const ready = Object.values(status.listeners || {}).filter(
     (item) => item.state === 'ready',
   ).length;
@@ -352,19 +378,7 @@ function render() {
       ready === expected ? '已订阅 ' + ready + ' 路' : ready + '/' + expected + ' 已订阅';
     listeningEl.className = 'status-normal';
   }
-  const counts = Object.fromEntries(
-    Object.entries(status.listeners || {}).map(([key, value]) => [key, value.accepted || 0]),
-  );
-  document.getElementById('listener-note').textContent =
-    '本次进程实际接收：单聊 ' +
-    (counts.direct || 0) +
-    ' 条，@我 ' +
-    (counts.at || 0) +
-    ' 条，' +
-    Object.entries(groupNames(status))
-      .map(([source, name]) => name + ' ' + (counts[source] || 0) + ' 条')
-      .join('，') +
-    ' 条。历史补读不计入实时接收；订阅就绪不代表已验证群事件投递。';
+  document.getElementById('listener-note').textContent = listenerNote(status, snapshot.groups);
   const agentLabel = document.getElementById('agent-label');
   if (agentLabel) {
     agentLabel.textContent = status.ai_provider || 'AI 助手';
@@ -381,7 +395,8 @@ function render() {
     (message) => message.draft && message.draft.status === 'pending' && message.draft.text.trim(),
   ).length;
   error(
-    status.error ||
+    status.groups_error ||
+      status.error ||
       (degraded ? '消息连接已降级，请检查监听日志；订阅就绪不代表正在正常接收。' : null),
   );
   document.title = '钉钉消息助手 · ' + active.length + ' 条待处理';
@@ -411,7 +426,8 @@ function render() {
     return (
       filter === 'all' ||
       message.sources.includes(filter) ||
-      (filter === 'groups' && message.sources.some(isGroupSource))
+      (filter === 'groups' &&
+        (snapshot.groups || []).some((group) => group.id === message.conversation_id))
     );
   });
   const pending = visible.filter((message) => !message.handled);
@@ -448,6 +464,10 @@ async function refresh() {
       next.status.error,
       next.status.appserver,
       next.status.listeners,
+      next.status.group_conversations,
+      next.status.group_names,
+      next.status.listener_count,
+      next.status.groups_error,
       next.groups,
     ]);
     const prevCount = generatingMessages.size;
