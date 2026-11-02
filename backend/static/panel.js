@@ -1,10 +1,12 @@
 const token = '__TOKEN__';
 let filter = 'all',
+  selectedGroupId = null,
   snapshot = null,
   showHandled = false,
   loading = false,
   last = '';
 const edits = new Map();
+let selectedMessages = new Set();
 const generatingMessages = new Map();
 const statuses = {
   pending: '待你审查',
@@ -132,23 +134,85 @@ function clean(text) {
 function isGroupSource(source) {
   return source === 'ued' || source.startsWith('group-');
 }
-function groupNames(status) {
-  return status.group_names || { ued: status.group_name || '关注群' };
+function sourceName(source, message) {
+  if (isGroupSource(source)) {
+    const group = (snapshot.groups || []).find((item) => item.id === message.conversation_id);
+    return group?.name || '已取消关注的群';
+  }
+  return { direct: '单聊', at: '@我' }[source] || source;
 }
-function sourceName(source) {
-  return { direct: '单聊', at: '@我' }[source] || groupNames(snapshot.status)[source] || source;
+function listenerNote(status, groups = []) {
+  const listeners = status.listeners || {};
+  const counts = [
+    '单聊 ' + (listeners.direct?.accepted || 0) + ' 条',
+    '@我 ' + (listeners.at?.accepted || 0) + ' 条',
+  ];
+  for (const group of groups) {
+    const source = Object.keys(status.group_conversations || {}).find(
+      (key) => status.group_conversations[key] === group.id,
+    );
+    const listener = listeners[source];
+    counts.push(
+      group.name +
+        ' ' +
+        (listener?.accepted || 0) +
+        ' 条' +
+        (!listener ? '（正在启动监听）' : listener.state !== 'ready' ? '（监听未就绪）' : ''),
+    );
+  }
+  return (
+    '本次进程实际接收：' +
+    counts.join('，') +
+    '。历史补读不计入实时接收；订阅就绪不代表已验证群事件投递。'
+  );
 }
-function renderGroups(groups) {
+function renderGroups(groups = []) {
+  if (selectedGroupId && !groups.some((group) => group.id === selectedGroupId)) {
+    selectedGroupId = null;
+    filter = 'groups';
+  }
   const root = document.getElementById('group-list');
   root.replaceChildren();
-  for (const group of groups || []) {
-    const item = el('div', undefined, 'group-item');
-    item.append(el('div', group.name, 'group-name'), el('div', group.id, 'group-id'));
-    item.append(button('删除', async () => {
-      if (confirm('停止关注「' + group.name + '」？重启服务后生效。')) await action('groups/remove', { id: group.id });
-    }));
+  if (!groups.length) root.append(el('p', '还没有关注群，点击 ＋ 添加', 'group-nav-empty'));
+  for (const group of groups) {
+    const item = el('div', undefined, 'group-nav-item');
+    const select = button(
+      '',
+      () => {
+        filter = 'groups';
+        selectedGroupId = group.id;
+        render();
+      },
+      'group-nav-select',
+    );
+    select.title = group.name;
+    select.dataset.groupId = group.id;
+    const count = snapshot.messages.filter(
+      (message) => !message.handled && message.conversation_id === group.id,
+    ).length;
+    select.append(el('span', group.name, 'group-nav-name'));
+    if (count) select.append(el('span', String(count), 'group-nav-count'));
+    select.classList.toggle('active', selectedGroupId === group.id);
+    select.setAttribute('aria-pressed', String(selectedGroupId === group.id));
+    const remove = button(
+      '×',
+      async () => {
+        if (confirm('停止关注「' + group.name + '」？将停止接收该群的新消息。')) {
+          await action('groups/remove', { id: group.id });
+        }
+      },
+      'group-nav-remove',
+    );
+    remove.setAttribute('aria-label', '取消关注 ' + group.name);
+    remove.title = '取消关注 ' + group.name;
+    item.append(select, remove);
     root.append(item);
   }
+  document.querySelectorAll('#tabs [data-filter]').forEach((node) => {
+    const active = node.dataset.filter === filter && !selectedGroupId;
+    node.classList.toggle('active', active);
+    node.setAttribute('aria-pressed', String(active));
+  });
 }
 let pendingTodo = null;
 function openTodo(target) {
@@ -166,7 +230,9 @@ function renderTodos(active) {
   root.replaceChildren();
   // 排除已忽略的待办项
   const todos = active.flatMap((message) =>
-    (message.todos || []).filter((task) => task.status !== 'ignored').map((task) => ({ task, message })),
+    (message.todos || [])
+      .filter((task) => task.status !== 'ignored')
+      .map((task) => ({ task, message })),
   );
   document.getElementById('todo-count').textContent = todos.filter(
     (item) => item.task.status === 'candidate',
@@ -196,17 +262,20 @@ function messageCard(message) {
   const card = el('article'),
     meta = el('div', undefined, 'meta');
   meta.append(el('span', message.sender, 'name'));
-  for (const source of message.sources)
-    meta.append(
-      el(
-        'span',
-        sourceName(source),
-        'tag',
-      ),
-    );
+  for (const source of message.sources) meta.append(el('span', sourceName(source, message), 'tag'));
   if (message.ingest_mode === 'history_backfill') meta.append(el('span', '历史补读', 'tag'));
   meta.append(el('span', String(message.time || '时间未提供'), 'time'));
   card.append(meta, el('div', clean(message.text), 'original'));
+  const select = el('input');
+  select.type = 'checkbox';
+  select.checked = selectedMessages.has(message.key);
+  select.setAttribute('aria-label', '选择 ' + message.sender + ' 的消息');
+  select.onchange = () => {
+    if (select.checked) selectedMessages.add(message.key);
+    else selectedMessages.delete(message.key);
+    updateBulkActions();
+  };
+  card.prepend(select);
   const draft = message.draft;
   if (draft)
     card.append(el('span', '消息整理', 'label'), el('div', draft.summary || '手动回复', 'summary'));
@@ -306,8 +375,7 @@ function render() {
       ['degraded', 'error', 'disconnected'].includes(item.transport?.state) ||
       item.state === 'stopped',
   );
-  const expected = status.listener_count || 3;
-  document.querySelector('[data-filter=groups]').textContent = '关注群';
+  const expected = status.listener_count ?? 2 + (snapshot.groups || []).length;
   const ready = Object.values(status.listeners || {}).filter(
     (item) => item.state === 'ready',
   ).length;
@@ -318,22 +386,10 @@ function render() {
     listeningEl.className = 'status-danger';
   } else {
     listeningEl.textContent =
-      ready === expected
-        ? '已订阅 ' + ready + ' 路'
-        : ready + '/' + expected + ' 已订阅';
+      ready === expected ? '已订阅 ' + ready + ' 路' : ready + '/' + expected + ' 已订阅';
     listeningEl.className = 'status-normal';
   }
-  const counts = Object.fromEntries(
-    Object.entries(status.listeners || {}).map(([key, value]) => [key, value.accepted || 0]),
-  );
-  document.getElementById('listener-note').textContent =
-    '本次进程实际接收：单聊 ' +
-    (counts.direct || 0) +
-    ' 条，@我 ' +
-    (counts.at || 0) +
-    ' 条，' +
-    Object.entries(groupNames(status)).map(([source, name]) => name + ' ' + (counts[source] || 0) + ' 条').join('，') +
-    ' 条。历史补读不计入实时接收；订阅就绪不代表已验证群事件投递。';
+  document.getElementById('listener-note').textContent = listenerNote(status, snapshot.groups);
   const agentLabel = document.getElementById('agent-label');
   if (agentLabel) {
     agentLabel.textContent = status.ai_provider || 'AI 助手';
@@ -350,7 +406,8 @@ function render() {
     (message) => message.draft && message.draft.status === 'pending' && message.draft.text.trim(),
   ).length;
   error(
-    status.error ||
+    status.groups_error ||
+      status.error ||
       (degraded ? '消息连接已降级，请检查监听日志；订阅就绪不代表正在正常接收。' : null),
   );
   document.title = '钉钉消息助手 · ' + active.length + ' 条待处理';
@@ -367,14 +424,27 @@ function render() {
           hour12: false,
         })
       : '消息整理后自动更新，也可以点击重新总结。');
-  renderTodos(active);
+  renderTodos(snapshot.messages);
   renderGroups(snapshot.groups);
   const root = document.getElementById('messages');
   root.replaceChildren();
-  const visible = snapshot.messages.filter(
-    (message) => filter === 'all' || message.sources.includes(filter) || (filter === 'groups' && message.sources.some(isGroupSource)),
-  );
+  const selectedGroup = (snapshot.groups || []).find((group) => group.id === selectedGroupId);
+  document.getElementById('messages-heading').textContent = selectedGroup
+    ? selectedGroup.name + ' · 待处理消息'
+    : '待处理消息';
+  const visible = snapshot.messages.filter((message) => {
+    if (selectedGroupId) return message.conversation_id === selectedGroupId;
+    return (
+      filter === 'all' ||
+      message.sources.includes(filter) ||
+      (filter === 'groups' &&
+        (snapshot.groups || []).some((group) => group.id === message.conversation_id))
+    );
+  });
   const pending = visible.filter((message) => !message.handled);
+  selectedMessages = new Set(
+    [...selectedMessages].filter((key) => pending.some((m) => m.key === key)),
+  );
   for (const message of pending) root.append(messageCard(message));
   if (!pending.length)
     root.append(el('div', '当前没有未处理消息。新消息到达后会自动出现。', 'empty'));
@@ -389,6 +459,7 @@ function render() {
     for (const message of handled) section.append(messageCard(message));
     root.append(section);
   }
+  updateBulkActions(pending);
   document.getElementById('updated').textContent =
     '更新于 ' +
     (status.updated || '刚刚') +
@@ -408,6 +479,10 @@ async function refresh() {
       next.status.error,
       next.status.appserver,
       next.status.listeners,
+      next.status.group_conversations,
+      next.status.group_names,
+      next.status.listener_count,
+      next.status.groups_error,
       next.groups,
     ]);
     const prevCount = generatingMessages.size;
@@ -420,9 +495,9 @@ async function refresh() {
       if (active && active.tagName === 'TEXTAREA') return;
       last = signature;
       render();
-    } else
-      document.getElementById('updated').textContent =
-        '更新于 ' + (next.status.updated || '刚刚') + ' · 展示最近 100 条消息；仅确认后写入钉钉。';
+    }
+    document.getElementById('updated').textContent =
+      '更新于 ' + (next.status.updated || '刚刚') + ' · 展示最近 100 条消息；仅确认后写入钉钉。';
   } catch (e) {
     error(e.message);
     const listeningEl = document.getElementById('listening');
@@ -438,10 +513,47 @@ async function refresh() {
 document.getElementById('tabs').onclick = (event) => {
   if (!event.target.dataset.filter) return;
   filter = event.target.dataset.filter;
+  selectedGroupId = null;
   document
     .querySelectorAll('nav button')
     .forEach((node) => node.classList.toggle('active', node.dataset.filter === filter));
   render();
+};
+function updateBulkActions(pending) {
+  const messages = pending || (snapshot?.messages || []).filter((message) => !message.handled);
+  const selectAll = document.getElementById('select-all-messages');
+  selectAll.checked =
+    messages.length > 0 && messages.every((message) => selectedMessages.has(message.key));
+  selectAll.indeterminate = selectedMessages.size > 0 && !selectAll.checked;
+  document.getElementById('bulk-handle').disabled = selectedMessages.size === 0;
+}
+document.getElementById('select-all-messages').onchange = () => {
+  const visible = snapshot.messages.filter(
+    (message) =>
+      !message.handled &&
+      (selectedGroupId
+        ? message.conversation_id === selectedGroupId
+        : filter === 'all' ||
+          message.sources.includes(filter) ||
+          (filter === 'groups' &&
+            snapshot.groups.some((group) => group.id === message.conversation_id))),
+  );
+  selectedMessages = new Set(
+    document.getElementById('select-all-messages').checked
+      ? visible.map((message) => message.key)
+      : [],
+  );
+  render();
+};
+document.getElementById('bulk-handle').onclick = async () => {
+  const keys = [...selectedMessages];
+  if (!keys.length || !confirm('将 ' + keys.length + ' 条消息标记为已处理？')) return;
+  try {
+    await action('handled/bulk', { keys });
+    selectedMessages.clear();
+  } catch (e) {
+    error(e.message);
+  }
 };
 document.getElementById('refresh-overview').onclick = async () => {
   const btn = document.getElementById('refresh-overview');
@@ -467,13 +579,16 @@ document.getElementById('add-group').onclick = () => {
   document.getElementById('group-dialog').showModal();
   loadAvailableGroups();
 };
-document.getElementById('group-cancel').onclick = () => document.getElementById('group-dialog').close();
+document.getElementById('group-cancel').onclick = () =>
+  document.getElementById('group-dialog').close();
 document.getElementById('group-form').onsubmit = async (event) => {
   event.preventDefault();
   try {
     if (!selectedGroups.size) throw Error('请至少选择一个群');
     for (const group of selectedGroups.values()) {
       await action('groups', { id: group.id, name: group.name });
+      selectedGroups.delete(group.id);
+      renderSelectedGroups();
     }
     document.getElementById('group-dialog').close();
   } catch (e) {
@@ -520,7 +635,10 @@ function renderAvailableGroups(query = '') {
   const options = document.getElementById('group-options');
   const input = document.getElementById('group-search');
   const normalizedQuery = query.trim().toLowerCase();
-  const groups = availableGroups.filter((item) => item.name.toLowerCase().includes(normalizedQuery));
+  const watchedIds = new Set((snapshot?.groups || []).map((group) => group.id));
+  const groups = availableGroups.filter(
+    (item) => !watchedIds.has(item.id) && item.name.toLowerCase().includes(normalizedQuery),
+  );
   options.replaceChildren();
   for (const group of groups) {
     const option = el('li', group.name, 'group-option');
@@ -543,13 +661,17 @@ async function loadAvailableGroups() {
     if (!response.ok) throw Error(value.error || '无法读取群列表');
     availableGroups = value.groups || [];
     renderAvailableGroups(document.getElementById('group-search').value);
-  } catch (e) { document.getElementById('group-dialog-error').textContent = e.message; }
+  } catch (e) {
+    document.getElementById('group-dialog-error').textContent = e.message;
+  }
 }
 document.getElementById('group-search').oninput = (event) => {
   renderAvailableGroups(event.target.value);
 };
-document.getElementById('group-search').onfocus = (event) => renderAvailableGroups(event.target.value);
-document.getElementById('group-search').onclick = (event) => renderAvailableGroups(event.target.value);
+document.getElementById('group-search').onfocus = (event) =>
+  renderAvailableGroups(event.target.value);
+document.getElementById('group-search').onclick = (event) =>
+  renderAvailableGroups(event.target.value);
 document.getElementById('group-search').onkeydown = (event) => {
   if (event.key === 'Escape') closeGroupOptions();
 };

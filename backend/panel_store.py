@@ -116,6 +116,19 @@ class PanelStore:
                 raise ValueError("原消息不存在")
             db.execute("INSERT OR REPLACE INTO handled VALUES (?,?)", (key, time.time()))
 
+    def archive_messages(self, keys):
+        if not isinstance(keys, list) or not keys or len(keys) > 100:
+            raise ValueError("请选择 1–100 条待处理消息")
+        if any(not isinstance(key, str) or not key for key in keys):
+            raise ValueError("消息标识无效")
+        with self.connect() as db:
+            timestamp = time.time()
+            for key in dict.fromkeys(keys):
+                if not db.execute("SELECT 1 FROM inbox WHERE key=?", (key,)).fetchone():
+                    raise ValueError("原消息不存在")
+                db.execute("INSERT OR REPLACE INTO handled VALUES (?,?)", (key, timestamp))
+        return len(set(keys))
+
     def is_message_handled(self, key):
         with self.connect() as db:
             return self.is_handled(db, key)

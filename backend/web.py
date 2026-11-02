@@ -116,6 +116,10 @@ def start_panel(store, status, regenerate, port=None, groups=None, add_group=Non
                 elif self.path == "/api/handled":
                     store.archive_message(body["key"])
                     regenerate("__overview__")
+                elif self.path == "/api/handled/bulk":
+                    count = store.archive_messages(body.get("keys"))
+                    regenerate("__overview__")
+                    return self.reply(202, {"ok": True, "count": count})
                 elif self.path == "/api/overview":
                     regenerate("__overview__")
                 elif self.path in {"/api/todo", "/api/todo-manual"}:

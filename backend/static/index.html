@@ -29,10 +29,16 @@
       <div class="hint">把找你的事，放在一起。</div>
       <nav id="tabs">
         <button data-filter="all" class="active">全部消息</button
-        ><button data-filter="direct">谁找我</button><button data-filter="at">谁 @我</button
-        ><button data-filter="groups">关注群</button>
+        ><button data-filter="direct">谁找我</button><button data-filter="at">谁 @我</button>
+        <div class="group-nav-heading">
+          <button data-filter="groups">关注群</button>
+          <button id="add-group" type="button" aria-label="添加关注群" title="添加关注群">
+            ＋
+          </button>
+        </div>
+        <div id="group-list" class="group-nav-list" aria-label="已关注的群"></div>
+        <p class="group-nav-note">增删后自动更新监听，无需重启服务。</p>
       </nav>
-      <div class="bottom hint">只关注消息，不接入 OA 审批。<br />回复由你确认后发送。</div>
     </aside>
     <main>
       <header>
@@ -42,17 +48,14 @@
       </header>
       <div class="stats">
         <div class="stat"><span>消息监听</span><strong id="listening">连接中</strong></div>
-        <div class="stat"><span id="agent-label">AI 助手</span><strong id="agent">连接中</strong></div>
+        <div class="stat">
+          <span id="agent-label">AI 助手</span><strong id="agent">连接中</strong>
+        </div>
         <div class="stat"><span>待审草稿</span><strong id="pending">0</strong></div>
         <div class="stat"><span>待办建议</span><strong id="todo-count">0</strong></div>
       </div>
       <p id="listener-note" class="small"></p>
       <div id="error" hidden></div>
-      <section class="group-manager">
-        <div class="section-title"><h2>关注群</h2><button id="add-group">添加关注群</button></div>
-        <div id="group-list"></div>
-        <p class="small">添加或删除会保存到本机配置；重启服务后开始或停止监听。</p>
-      </section>
       <div class="overview-grid">
         <section class="overview-box">
           <div class="section-title">
@@ -68,7 +71,13 @@
           <p class="small">确认后添加到我的钉钉待办，不自动设置截止时间。</p>
         </section>
       </div>
-      <div class="section-title"><h2>待处理消息</h2></div>
+      <div class="section-title message-list-heading">
+        <h2 id="messages-heading">待处理消息</h2>
+        <div class="bulk-actions">
+          <label><input id="select-all-messages" type="checkbox" />全选</label
+          ><button id="bulk-handle" disabled>标记已处理</button>
+        </div>
+      </div>
       <p class="section-note">长连接实时接收单聊、@我和关注群消息；AI 按批次整理。</p>
       <div id="messages"></div>
       <div class="footer" id="updated">正在读取消息…</div>
@@ -104,7 +113,10 @@
           <ul id="group-options" class="group-options" role="listbox" hidden></ul>
         </div>
         <p id="group-dialog-error" class="dialog-error"></p>
-        <div class="actions"><button type="button" id="group-cancel">取消</button><button type="submit" class="primary">保存关注群</button></div>
+        <div class="actions">
+          <button type="button" id="group-cancel">取消</button
+          ><button type="submit" class="primary">保存关注群</button>
+        </div>
       </form>
     </dialog>
     <script nonce="__TOKEN__" src="/panel.js"></script>

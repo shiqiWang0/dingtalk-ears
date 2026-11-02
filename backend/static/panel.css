@@ -90,7 +90,9 @@ aside {
   color: #556c5e;
   border-radius: 6px;
   padding: 4px;
-  transition: color 0.15s, background-color 0.15s;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
 }
 
 .github-link:hover {
@@ -243,24 +245,92 @@ header p {
   font-size: 12px;
 }
 
-.group-manager {
-  background: white;
-  border: 1px solid #dfe5dc;
-  border-radius: 14px;
-  margin: 0 0 28px;
-  padding: 20px 24px;
+#tabs {
+  max-height: calc(100dvh - 230px);
+  overflow-y: auto;
 }
 
-.group-item {
+.group-nav-heading {
   display: flex;
   align-items: center;
-  gap: 10px;
-  border-top: 1px solid #edf1eb;
-  padding: 12px 0;
+  gap: 4px;
 }
 
-.group-name { font-weight: 650; }
-.group-id { color: #71836e; font-size: 12px; overflow-wrap: anywhere; flex: 1; }
+.group-nav-heading > [data-filter] {
+  flex: 1;
+}
+
+#add-group,
+.group-nav-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.group-nav-list {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.group-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.group-nav-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 9px 8px 9px 16px;
+  font-size: 13px;
+}
+
+.group-nav-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-nav-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: #687b6e;
+}
+
+.group-nav-remove {
+  opacity: 0;
+  color: #a23c34;
+}
+
+.group-nav-item:hover .group-nav-remove,
+.group-nav-item:focus-within .group-nav-remove {
+  opacity: 1;
+}
+
+.group-nav-note,
+.group-nav-empty {
+  margin: 0 8px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #687b6e;
+}
+
+@media (hover: none) {
+  .group-nav-remove {
+    opacity: 1;
+  }
+}
 
 #error {
   position: fixed;
@@ -277,7 +347,9 @@ header p {
   border: 1px solid #f6cfbc;
   border-radius: 9px;
   padding: 12px 16px;
-  box-shadow: 0 4px 18px rgba(144, 75, 52, 0.18), 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 4px 18px rgba(144, 75, 52, 0.18),
+    0 1px 3px rgba(0, 0, 0, 0.08);
   white-space: pre-wrap;
 }
 
@@ -619,7 +691,9 @@ dialog input {
   border: 1px solid #d9d9d9;
   border-radius: 6px;
   background: #fff;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .group-combobox::after {
@@ -672,7 +746,10 @@ dialog input {
   background: #fff;
   border: 0;
   border-radius: 8px;
-  box-shadow: 0 6px 16px 0 rgb(0 0 0 / 8%), 0 3px 6px -4px rgb(0 0 0 / 12%), 0 9px 28px 8px rgb(0 0 0 / 5%);
+  box-shadow:
+    0 6px 16px 0 rgb(0 0 0 / 8%),
+    0 3px 6px -4px rgb(0 0 0 / 12%),
+    0 9px 28px 8px rgb(0 0 0 / 5%);
 }
 
 .group-option,
@@ -742,4 +819,23 @@ dialog .dialog-error {
 
 .brand-dot {
   color: #72916a;
+}
+
+.message-list-heading {
+  justify-content: space-between;
+}
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bulk-actions label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bulk-actions input,
+#messages article > input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
 }
