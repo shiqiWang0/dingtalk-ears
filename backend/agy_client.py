@@ -1,7 +1,6 @@
 """Integration with Antigravity CLI (agy) for draft generation and summaries."""
 
 import json
-import os
 import shutil
 import subprocess
 import threading

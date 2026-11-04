@@ -14,6 +14,7 @@ from .appserver import AppServer
 from .config import add_group, bind_state, configured_groups, remove_group
 from .dingtalk import list_joined_groups
 from .listeners import ListenerManager
+from .media import MediaDownloader
 from .panel_store import PanelStore
 from .queue_store import Store
 from .utils import atomic_write, now_text
@@ -42,6 +43,8 @@ class Host:
             "group_name": config.group_name,
             "group_names": {},
             "listener_count": 2 + len(config.watched_groups),
+            "retention_days": config.retention_days,
+            "purged": {"messages": 0, "queue": 0, "media": 0},
             "error": None,
             "received": 0,
         }
@@ -152,13 +155,22 @@ class Host:
             self.config.max_messages,
         )
         self.panel = PanelStore(self.config.state_dir / "panel.db", self.config)
+        self.media = MediaDownloader(self.config, self.panel)
+        cutoff = time.time() - self.config.retention_days * 86400
+        self.status["purged"] = {
+            "messages": self.panel.prune_before(cutoff),
+            "queue": store.prune_before(cutoff),
+            "media": self.media.prune_unreferenced(self.panel.image_paths()),
+        }
         self.overview_requested = self.panel.get_overview()["updated"] is None
         for message in store.history():
             self.panel.receive(message)
+            self.media.queue(message)
         server = start_panel(
             self.panel,
             lambda: self.status,
             self.controls.put,
+            media_root=self.config.state_dir / "media",
             groups=lambda: configured_groups(self.config.config_path),
             add_group=lambda group_id, name: add_group(self.config.config_path, group_id, name),
             remove_group=lambda group_id: remove_group(self.config.config_path, group_id),
@@ -188,6 +200,8 @@ class Host:
                 appserver="error", summary_state="paused_after_error", error=str(error)
             )
         digest = self.config.output_dir / "消息摘要.md"
+        if self.status["purged"]["messages"] and digest.exists():
+            digest.unlink()
         if not digest.exists():
             digest.write_text(
                 "# 钉钉消息摘要\n\n等待接通后收到的新消息。只整理，不自动回复。\n", encoding="utf-8"
@@ -225,6 +239,7 @@ class Host:
                     message = self.inbox.get(timeout=1)
                     store.add(message, time.time())
                     self.panel.receive(message)
+                    self.media.queue(message)
                     self.status["received"] += 1
                 except queue.Empty:
                     pass

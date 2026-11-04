@@ -48,7 +48,7 @@ button.loading::before {
   width: 12px;
   height: 12px;
   margin-right: 6px;
-  border: 2px solid currentColor;
+  border: 2px solid currentcolor;
   border-right-color: transparent;
   border-radius: 50%;
   vertical-align: -1px;
@@ -90,7 +90,9 @@ aside {
   color: #556c5e;
   border-radius: 6px;
   padding: 4px;
-  transition: color 0.15s, background-color 0.15s;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
 }
 
 .github-link:hover {
@@ -198,43 +200,47 @@ header p {
 
 #listening.status-danger::before {
   background-color: #cf222e;
-  box-shadow: 0 0 0 0 rgba(207, 34, 46, 0.7);
+  box-shadow: 0 0 0 0 rgb(207 34 46 / 70%);
   animation: pulse-red 2s infinite ease-in-out;
 }
 
 #listening.status-normal::before {
   background-color: #2da44e;
-  box-shadow: 0 0 0 0 rgba(45, 164, 78, 0.7);
+  box-shadow: 0 0 0 0 rgb(45 164 78 / 70%);
   animation: pulse-green 2s infinite ease-in-out;
 }
 
 @keyframes pulse-red {
   0% {
     transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(207, 34, 46, 0.7);
+    box-shadow: 0 0 0 0 rgb(207 34 46 / 70%);
   }
+
   70% {
     transform: scale(1);
-    box-shadow: 0 0 0 6px rgba(207, 34, 46, 0);
+    box-shadow: 0 0 0 6px rgb(207 34 46 / 0%);
   }
+
   100% {
     transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(207, 34, 46, 0);
+    box-shadow: 0 0 0 0 rgb(207 34 46 / 0%);
   }
 }
 
 @keyframes pulse-green {
   0% {
     transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(45, 164, 78, 0.7);
+    box-shadow: 0 0 0 0 rgb(45 164 78 / 70%);
   }
+
   70% {
     transform: scale(1);
-    box-shadow: 0 0 0 6px rgba(45, 164, 78, 0);
+    box-shadow: 0 0 0 6px rgb(45 164 78 / 0%);
   }
+
   100% {
     transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(45, 164, 78, 0);
+    box-shadow: 0 0 0 0 rgb(45 164 78 / 0%);
   }
 }
 
@@ -259,8 +265,16 @@ header p {
   padding: 12px 0;
 }
 
-.group-name { font-weight: 650; }
-.group-id { color: #71836e; font-size: 12px; overflow-wrap: anywhere; flex: 1; }
+.group-name {
+  font-weight: 650;
+}
+
+.group-id {
+  color: #71836e;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  flex: 1;
+}
 
 #error {
   position: fixed;
@@ -271,13 +285,14 @@ header p {
   z-index: 1000;
   box-sizing: border-box;
   color: #904b34;
-  background: rgba(255, 240, 228, 0.96);
+  background: rgb(255 240 228 / 96%);
   backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   border: 1px solid #f6cfbc;
   border-radius: 9px;
   padding: 12px 16px;
-  box-shadow: 0 4px 18px rgba(144, 75, 52, 0.18), 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 4px 18px rgb(144 75 52 / 18%),
+    0 1px 3px rgb(0 0 0 / 8%);
   white-space: pre-wrap;
 }
 
@@ -329,6 +344,26 @@ article {
   margin-top: 19px;
   max-height: 230px;
   overflow: auto;
+}
+
+.image-message {
+  margin: 19px 0 0;
+}
+
+.image-message img {
+  display: block;
+  max-width: min(100%, 560px);
+  max-height: 480px;
+  border: 1px solid #dfe5dc;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.image-message figcaption,
+.image-status {
+  color: #71836e;
+  font-size: 12px;
+  margin-top: 7px;
 }
 
 .label {
@@ -619,7 +654,9 @@ dialog input {
   border: 1px solid #d9d9d9;
   border-radius: 6px;
   background: #fff;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .group-combobox::after {
@@ -672,7 +709,10 @@ dialog input {
   background: #fff;
   border: 0;
   border-radius: 8px;
-  box-shadow: 0 6px 16px 0 rgb(0 0 0 / 8%), 0 3px 6px -4px rgb(0 0 0 / 12%), 0 9px 28px 8px rgb(0 0 0 / 5%);
+  box-shadow:
+    0 6px 16px 0 rgb(0 0 0 / 8%),
+    0 3px 6px -4px rgb(0 0 0 / 12%),
+    0 9px 28px 8px rgb(0 0 0 / 5%);
 }
 
 .group-option,

@@ -3,11 +3,15 @@
 import hashlib
 import json
 
+from .media import image_resource
+
 EVENTS = {
     "direct": "user_im_message_receive_o2o_all",
     "at": "user_im_message_receive_at",
     "ued": "user_im_message_receive_group",
 }
+
+IGNORED_SENDERS = {"工作汇报(日志)", "工作汇报"}
 
 
 def normalize(raw, source, self_id, group_ids=()):
@@ -53,6 +57,9 @@ def normalize(raw, source, self_id, group_ids=()):
     )
     if not cid or not (text or mid):
         return None
+    sender = value.get("sender") or sid or "发送人未提供"
+    if sender in IGNORED_SENDERS or (isinstance(text, str) and text.startswith("[日志]:")):
+        return None
     key = (
         cid + ":" + mid
         if mid
@@ -60,14 +67,18 @@ def normalize(raw, source, self_id, group_ids=()):
             json.dumps([cid, sid, timestamp, text], ensure_ascii=False).encode()
         ).hexdigest()
     )
-    return {
+    result = {
         "key": key,
         "message_id": mid,
         "conversation_id": cid,
-        "sender": value.get("sender") or sid or "发送人未提供",
+        "sender": sender,
         "sender_id": sid,
         "time": timestamp,
         "text": text or "[非文本消息，需另行查看]",
         "sources": [source],
         "quoted_message": value.get("quoted_message") or value.get("quotedMessage"),
     }
+    resource_id = image_resource(text)
+    if resource_id:
+        result["image"] = {"state": "pending", "resource_id": resource_id}
+    return result

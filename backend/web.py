@@ -5,15 +5,28 @@ import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 from .dingtalk import create_todo, deliver
+from .media import image_content_type, safe_image_path
 
 
-def start_panel(store, status, regenerate, port=None, groups=None, add_group=None, remove_group=None, available_groups=None):
+def start_panel(
+    store,
+    status,
+    regenerate,
+    port=None,
+    groups=None,
+    add_group=None,
+    remove_group=None,
+    available_groups=None,
+    media_root=None,
+):
     port = store.config.port if port is None else port
     static = Path(__file__).with_name("static")
     token = secrets.token_urlsafe(32)
     page = (static / "index.html").read_text(encoding="utf-8").replace("__TOKEN__", token)
+    media_root = Path(media_root) if media_root else None
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -23,9 +36,11 @@ def start_panel(store, status, regenerate, port=None, groups=None, add_group=Non
             body = (
                 data
                 if isinstance(data, (bytes, bytearray))
-                else data.encode("utf-8")
-                if isinstance(data, str)
-                else json.dumps(data, ensure_ascii=False).encode("utf-8")
+                else (
+                    data.encode("utf-8")
+                    if isinstance(data, str)
+                    else json.dumps(data, ensure_ascii=False).encode("utf-8")
+                )
             )
             self.send_response(code)
             self.send_header("Content-Type", content_type)
@@ -92,6 +107,16 @@ def start_panel(store, status, regenerate, port=None, groups=None, add_group=Non
                 )
             if self.path == "/api/groups/available" and available_groups:
                 return self.reply(200, {"groups": available_groups()})
+            if self.path.startswith("/media/") and media_root:
+                key = unquote(urlsplit(self.path).path[len("/media/") :])
+                try:
+                    image = store.get_message(key).get("image") or {}
+                    path = safe_image_path(media_root, image.get("path"))
+                    if not path:
+                        raise ValueError("图片不可用")
+                    return self.reply(200, path.read_bytes(), image_content_type(path))
+                except (OSError, ValueError):
+                    return self.reply(404, {"error": "图片不可用"})
             self.reply(404, {"error": "不存在"})
 
         def do_POST(self):

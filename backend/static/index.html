@@ -42,14 +42,19 @@
       </header>
       <div class="stats">
         <div class="stat"><span>消息监听</span><strong id="listening">连接中</strong></div>
-        <div class="stat"><span id="agent-label">AI 助手</span><strong id="agent">连接中</strong></div>
+        <div class="stat">
+          <span id="agent-label">AI 助手</span><strong id="agent">连接中</strong>
+        </div>
         <div class="stat"><span>待审草稿</span><strong id="pending">0</strong></div>
         <div class="stat"><span>待办建议</span><strong id="todo-count">0</strong></div>
       </div>
       <p id="listener-note" class="small"></p>
       <div id="error" hidden></div>
       <section class="group-manager">
-        <div class="section-title"><h2>关注群</h2><button id="add-group">添加关注群</button></div>
+        <div class="section-title">
+          <h2>关注群</h2>
+          <button id="add-group">添加关注群</button>
+        </div>
         <div id="group-list"></div>
         <p class="small">添加或删除会保存到本机配置；重启服务后开始或停止监听。</p>
       </section>
@@ -104,7 +109,10 @@
           <ul id="group-options" class="group-options" role="listbox" hidden></ul>
         </div>
         <p id="group-dialog-error" class="dialog-error"></p>
-        <div class="actions"><button type="button" id="group-cancel">取消</button><button type="submit" class="primary">保存关注群</button></div>
+        <div class="actions">
+          <button type="button" id="group-cancel">取消</button
+          ><button type="submit" class="primary">保存关注群</button>
+        </div>
       </form>
     </dialog>
     <script nonce="__TOKEN__" src="/panel.js"></script>

@@ -79,6 +79,26 @@ class DistributionTests(unittest.TestCase):
         self.assertNotIn("TOKEN", decoded["EnvironmentVariables"])
         self.assertFalse(decoded["KeepAlive"])
 
+    def test_launch_agent_drops_non_utf8_path_entries(self):
+        path = self.root / "config.local.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "profile": "corp:user",
+                    "self_id": "openid",
+                    "display_name": "甲",
+                    "groups": [{"id": "group", "name": "设计"}],
+                }
+            )
+        )
+        value = self.module.launch_agent(
+            path,
+            sys.executable,
+            {"PATH": "/custom/bin:" + "\udc96" + ":/usr/bin"},
+        )
+        decoded = plistlib.loads(plistlib.dumps(value))
+        self.assertEqual(decoded["EnvironmentVariables"]["PATH"], "/custom/bin:/usr/bin")
+
     def test_cli_init_does_not_overwrite_and_bad_config_does_not_start(self):
         path = self.root / "config.local.json"
         command = [sys.executable, "-m", "backend"]

@@ -9,6 +9,9 @@
   "server": {
     "port": 8766
   },
+  "retention": {
+    "days": 7
+  },
   "paths": {
     "state_dir": "./data",
     "output_dir": "./data/output"

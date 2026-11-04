@@ -41,6 +41,11 @@ class Store:
         for row in self.db.execute("SELECT body FROM messages ORDER BY first_seen"):
             yield json.loads(row[0])
 
+    def prune_before(self, cutoff):
+        cursor = self.db.execute("DELETE FROM messages WHERE first_seen < ?", (cutoff,))
+        self.db.commit()
+        return cursor.rowcount
+
     def requeue(self, key):
         self.db.execute("UPDATE messages SET done=0,first_seen=0 WHERE key=?", (key,))
         self.db.commit()

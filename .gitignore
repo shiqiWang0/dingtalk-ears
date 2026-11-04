@@ -4,6 +4,7 @@ config.local.json
 com.codex.dingtalk-ears.plist
 data/
 node_modules/
+.npm-cache/
 .venv*/
 __pycache__/
 *.py[cod]
@@ -23,3 +24,10 @@ dist/
 .ruff_cache/
 .pytest_cache/
 .stylelintcache
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+.DS_Store
+launchagent*.plist
+*.swp

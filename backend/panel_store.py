@@ -69,6 +69,41 @@ class PanelStore:
                 raise ValueError("原消息不存在")
             return json.loads(row["body"])
 
+    def set_image(self, key, image):
+        with self.connect() as db:
+            row = db.execute("SELECT body FROM inbox WHERE key=?", (key,)).fetchone()
+            if not row:
+                raise ValueError("原消息不存在")
+            message = json.loads(row["body"])
+            message["image"] = image
+            db.execute(
+                "UPDATE inbox SET body=? WHERE key=?",
+                (json.dumps(message, ensure_ascii=False), key),
+            )
+
+    def prune_before(self, cutoff):
+        with self.connect() as db:
+            rows = db.execute("SELECT key,body FROM inbox WHERE received < ?", (cutoff,)).fetchall()
+            keys = [row["key"] for row in rows]
+            for key in keys:
+                db.execute("DELETE FROM drafts WHERE message_key=?", (key,))
+                db.execute("DELETE FROM todos WHERE message_key=?", (key,))
+                db.execute("DELETE FROM handled WHERE message_key=?", (key,))
+                db.execute("DELETE FROM inbox WHERE key=?", (key,))
+            if keys:
+                db.execute("DELETE FROM threads WHERE cid NOT IN (SELECT DISTINCT cid FROM inbox)")
+                db.execute("DELETE FROM metadata WHERE key='overview'")
+            return len(keys)
+
+    def image_paths(self):
+        with self.connect() as db:
+            paths = set()
+            for row in db.execute("SELECT body FROM inbox"):
+                image = (json.loads(row["body"]).get("image") or {}).get("path")
+                if isinstance(image, str):
+                    paths.add(image)
+            return paths
+
     def get_thread(self, cid):
         with self.connect() as db:
             row = db.execute("SELECT thread_id FROM threads WHERE cid=?", (cid,)).fetchone()

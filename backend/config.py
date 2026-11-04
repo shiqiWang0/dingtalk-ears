@@ -168,10 +168,7 @@ _CONFIG_LOCK = threading.Lock()
 def configured_groups(path):
     """Return local-panel-safe group metadata from the current configuration."""
     config = load_config(path)
-    return [
-        {"id": group_id, "name": name}
-        for group_id, name in config.watched_groups
-    ]
+    return [{"id": group_id, "name": name} for group_id, name in config.watched_groups]
 
 
 def _write_config(path, value):
@@ -216,7 +213,9 @@ def add_group(path, group_id, name):
         name = _text(name, "群名称")
         if group_id in config.group_ids:
             raise ValueError("该群已在关注列表中")
-        value = json.loads(config.config_path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
+        value = json.loads(
+            config.config_path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object
+        )
         groups = list(value.get("groups", []))
         groups.append({"id": group_id, "name": name})
         value["groups"] = groups
@@ -228,7 +227,9 @@ def remove_group(path, group_id):
     with _CONFIG_LOCK:
         config = load_config(path)
         group_id = _text(group_id, "群 ID")
-        value = json.loads(config.config_path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
+        value = json.loads(
+            config.config_path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object
+        )
         groups = [item for item in value.get("groups", []) if item.get("id") != group_id]
         if len(groups) == len(value.get("groups", [])):
             raise ValueError("关注群不存在")
@@ -258,7 +259,9 @@ def bind_state(config, adopt=False):
         if existing.get("profile") != config.profile or existing.get("self_id") != config.self_id:
             raise ValueError("数据目录属于其他账号或群，请配置独立的 state_dir")
         if existing != owner:
-            marker.write_text(json.dumps(owner, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            marker.write_text(
+                json.dumps(owner, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
         return
     if not adopt and any((directory / name).exists() for name in ["queue.db", "panel.db"]):
         raise ValueError("旧数据库没有身份标记；备份核对后使用 run --adopt-state 认领一次")
