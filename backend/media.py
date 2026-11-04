@@ -58,6 +58,15 @@ class MediaDownloader:
         self.lock = threading.Lock()
 
     def queue(self, message):
+        if (message.get("image") or {}).get("state") == "ready":
+            return
+        if self.store and message.get("key"):
+            try:
+                stored = self.store.get_message(message["key"])
+                if (stored.get("image") or {}).get("state") == "ready":
+                    return
+            except (KeyError, ValueError):
+                pass
         resource_id = (message.get("image") or {}).get("resource_id") or image_resource(
             message.get("text")
         )
@@ -76,6 +85,8 @@ class MediaDownloader:
             message = self.store.get_message(key)
             if not message.get("message_id") or not message.get("conversation_id"):
                 raise ValueError("图片消息缺少资源定位信息")
+            if (message.get("image") or {}).get("state") == "ready":
+                return
             directory = hashlib.sha256(key.encode("utf-8")).hexdigest()
             output = self.root / directory
             output.mkdir(parents=True, exist_ok=True)
