@@ -27,6 +27,26 @@ ROOT_FILES = {
 DOC_FILES = {"安装配置与启动.md", "架构说明.md"}
 
 
+def _plist_path(value):
+    """Keep only UTF-8-safe PATH entries for LaunchAgent serialization."""
+    entries = []
+    for entry in value.split(os.pathsep):
+        try:
+            entry.encode("utf-8")
+        except UnicodeEncodeError:
+            continue
+        entries.append(entry)
+    return os.pathsep.join(entries) or os.defpath
+
+
+def _plist_text(value):
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return None
+    return value
+
+
 def create_archive(root, output):
     """Ship source only. Reject links rather than following arbitrary targets."""
     root, output = Path(root).resolve(), Path(output).resolve()
@@ -77,8 +97,8 @@ def launch_agent(config_path, python=None, environment=None):
     python = str(python_path)
     project = Path(__file__).resolve().parent.parent
     env = {
-        "PATH": environment.get("PATH", os.defpath),
-        "LANG": environment.get("LANG", "en_US.UTF-8"),
+        "PATH": _plist_path(environment.get("PATH", os.defpath)),
+        "LANG": _plist_text(environment.get("LANG", "en_US.UTF-8")) or "en_US.UTF-8",
         "PYTHONUNBUFFERED": "1",
     }
     for key in [
@@ -91,8 +111,9 @@ def launch_agent(config_path, python=None, environment=None):
         "ALL_PROXY",
         "NO_PROXY",
     ]:
-        if environment.get(key):
-            env[key] = environment[key]
+        value = environment.get(key)
+        if value and _plist_text(value) is not None:
+            env[key] = value
     return {
         "Label": "com.codex.dingtalk-ears",
         "ProgramArguments": [
