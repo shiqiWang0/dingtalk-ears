@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import quote
 
 from backend.panel_store import PanelStore
 from backend.web import start_panel
@@ -27,16 +28,32 @@ class WebTests(unittest.TestCase):
                 groups[:] = [group for group in groups if group["id"] != group_id]
 
             server = start_panel(
-                store, lambda: {}, lambda key: None, port=0, groups=lambda: groups, add_group=add, remove_group=remove
+                store,
+                lambda: {},
+                lambda key: None,
+                port=0,
+                groups=lambda: groups,
+                add_group=add,
+                remove_group=remove,
             )
             connection = http.client.HTTPConnection("127.0.0.1", server.server_address[1])
             try:
                 connection.request("GET", "/")
-                token = re.search('nonce="([^"]+)"', connection.getresponse().read().decode()).group(1)
-                headers = {"Origin": "http://127.0.0.1:" + str(server.server_address[1]), "X-Panel-Token": token, "Content-Type": "application/json"}
-                connection.request("POST", "/api/groups", json.dumps({"id": "extra", "name": "研发群"}), headers)
+                token = re.search(
+                    'nonce="([^"]+)"', connection.getresponse().read().decode()
+                ).group(1)
+                headers = {
+                    "Origin": "http://127.0.0.1:" + str(server.server_address[1]),
+                    "X-Panel-Token": token,
+                    "Content-Type": "application/json",
+                }
+                connection.request(
+                    "POST", "/api/groups", json.dumps({"id": "extra", "name": "研发群"}), headers
+                )
                 self.assertEqual(connection.getresponse().status, 202)
-                connection.request("POST", "/api/groups/remove", json.dumps({"id": "extra"}), headers)
+                connection.request(
+                    "POST", "/api/groups/remove", json.dumps({"id": "extra"}), headers
+                )
                 self.assertEqual(connection.getresponse().status, 202)
                 connection.request("GET", "/api/state")
                 self.assertEqual(json.loads(connection.getresponse().read())["groups"], groups)
@@ -174,5 +191,45 @@ class WebTests(unittest.TestCase):
                 local_post_resp.read()
                 local_conn.close()
             finally:
+                server.shutdown()
+                server.server_close()
+
+    def test_image_route_serves_only_a_message_local_image(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = PanelStore(
+                root / "panel.db", SimpleNamespace(port=8766, dws="unused", profile="test")
+            )
+            image = root / "media" / "one" / "image.png"
+            image.parent.mkdir(parents=True)
+            image.write_bytes(
+                bytes.fromhex(
+                    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+                    "0000000d4944415478da6360f8cfc0000003010180c5f7b20000000049454e44ae426082"
+                )
+            )
+            store.receive(
+                {
+                    "key": "cid:m1",
+                    "conversation_id": "cid",
+                    "text": "图片",
+                    "sources": ["direct"],
+                    "image": {"state": "ready", "path": "one/image.png"},
+                }
+            )
+            server = start_panel(
+                store, lambda: {}, lambda key: None, port=0, media_root=root / "media"
+            )
+            connection = http.client.HTTPConnection("127.0.0.1", server.server_address[1])
+            try:
+                connection.request("GET", "/media/" + quote("cid:m1", safe=""))
+                response = connection.getresponse()
+                self.assertEqual(response.status, 200)
+                self.assertEqual(response.getheader("Content-Type"), "image/png")
+                response.read()
+                connection.request("GET", "/media/" + quote("../outside", safe=""))
+                self.assertEqual(connection.getresponse().status, 404)
+            finally:
+                connection.close()
                 server.shutdown()
                 server.server_close()

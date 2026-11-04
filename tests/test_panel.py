@@ -147,6 +147,16 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(self.store.get_overview()["count"], 1)
         self.assertIsNone(self.store.snapshot()[0]["draft"])
 
+    def test_retention_removes_expired_message_state_and_image_reference(self):
+        self.store.set_image(self.msg["key"], {"state": "ready", "path": "old/image.png"})
+        self.draft()
+        with self.store.connect() as db:
+            db.execute("UPDATE inbox SET received=0 WHERE key=?", (self.msg["key"],))
+        self.assertEqual(self.store.prune_before(1), 1)
+        with self.assertRaises(ValueError):
+            self.store.get_message(self.msg["key"])
+        self.assertEqual(self.store.image_paths(), set())
+
     def test_cross_origin_and_missing_token_cannot_trigger_send(self):
         import http.client
         import socket

@@ -64,6 +64,47 @@ class EarsTests(unittest.TestCase):
             self.m.normalize({"sender_open_dingtalk_id": self.m.SELF, "content": "自己"}, "direct")
         )
 
+    def test_rejects_work_report_log_messages_regardless_of_content(self):
+        for text in (
+            "[日志]:贺洋洋的日报 url: https://landray.dingtalkapps.com/alid/app/report/viewReport_new.html?id=123",
+            "请查看这份工作汇报。",
+        ):
+            self.assertIsNone(
+                self.m.normalize(
+                    {
+                        "conversation_id": "direct-1",
+                        "message_id": "daily-report",
+                        "sender": "工作汇报(日志)",
+                        "content": text,
+                    },
+                    "direct",
+                )
+            )
+        self.assertIsNone(
+            self.m.normalize(
+                {
+                    "conversation_id": "direct-1",
+                    "message_id": "daily-report-prefix",
+                    "sender": "其他同事",
+                    "content": "[日志]:曹端庆的日报 url: https://landray.dingtalkapps.com/test",
+                },
+                "direct",
+            )
+        )
+
+    def test_normalize_extracts_image_resource(self):
+        got = self.m.normalize(
+            {
+                "conversation_id": "direct-1",
+                "message_id": "m-img",
+                "sender": "同事",
+                "content": "请看[图片消息](mediaId=@lQLPJxxx)",
+            },
+            "direct",
+        )
+        self.assertIsNotNone(got)
+        self.assertEqual(got["image"], {"state": "pending", "resource_id": "@lQLPJxxx"})
+
     def test_accepts_each_configured_group(self):
         self.assertIsNotNone(
             self.m.normalize(
